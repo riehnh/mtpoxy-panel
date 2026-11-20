@@ -28,7 +28,8 @@ public class MainActivity extends Activity {
  enum Screen { HOME, MANUAL, FREE, AUTOMATIC }
  boolean loadingFree=false;
  volatile CancellableOperation operation;
- String pendingVersion="";boolean updateOffered=false,foreground=false;
+ String pendingVersion="";boolean updateOffered=false,foreground=false,updateChecking=false,manualUpdateRequested=false,pendingUpdateManual=false;
+ AlertDialog aboutDialog;TextView aboutUpdateStatus;Button aboutCheckButton;
  LinearLayout freeRows;Button refreshFree,checkFree,bestFree;int visibleFree=60;
  final ArrayList<Proxy> candidates=new ArrayList<>();
  final ArrayList<Proxy> proxies=new ArrayList<>();
@@ -57,7 +58,7 @@ public class MainActivity extends Activity {
   manualProgress=progress;
   manualStatus=status;
   showHome();
-  checkUpdates();
+  checkUpdates(false);
  }
  LinearLayout modePage(){
   ScrollView scroll=new ScrollView(this);
@@ -81,11 +82,7 @@ public class MainActivity extends Activity {
  void showHome(){
   screen=Screen.HOME;LinearLayout page=modePage();
   TextView greeting=text("Тележенька ты где?",21,0xfff8f8f8);greeting.setTypeface(null,1);page.addView(greeting);space(page,6);page.addView(text("Надо только облизнуть",14,0xffd7d7d7));space(page,20);
-  LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setGravity(Gravity.CENTER);panel.setPadding(dp(16),dp(14),dp(16),dp(16));panel.setBackgroundColor(0xffffb44d);page.addView(panel,new LinearLayout.LayoutParams(-1,-2));
-  TextView cap=text("БЕСПЛАТНЫЕ ПРОКСИ",12,0xff454545);cap.setTypeface(null,1);panel.addView(cap);
-  AnimationTileView animation=new AnimationTileView(this,()->showAutomatic());panel.addView(animation,new LinearLayout.LayoutParams(-1,dp(180)));
-
-  Button own=button("Халява  →",false);own.setOnClickListener(v->showAutomatic());panel.addView(own,new LinearLayout.LayoutParams(-1,dp(50)));space(panel,8);panel.addView(text("Найти бесплатный прокси для Telegram",13,0xff454545));space(page,16);
+  FrameLayout buttonArea=new FrameLayout(this);FreeButtonView freeButton=new FreeButtonView(this);freeButton.setOnClickListener(v->showAutomatic());buttonArea.addView(freeButton,new FrameLayout.LayoutParams(dp(252),dp(252),Gravity.CENTER));page.addView(buttonArea,new LinearLayout.LayoutParams(-1,dp(264)));space(page,16);
   LinearLayout choices=new LinearLayout(this);LinearLayout free=tile("Жупень","МОЙ VPS","↗",0xffffda59,()->openPanel());LinearLayout manual=tile("Манул","Выбрать из списка","≡",0xff94d9e8,()->openManual());LinearLayout.LayoutParams left=new LinearLayout.LayoutParams(0,-2,1);left.rightMargin=dp(8);choices.addView(free,left);choices.addView(manual,new LinearLayout.LayoutParams(0,-2,1));page.addView(choices);space(page,16);
   TextView sourceHeading=text("ИСТОЧНИКИ БЕСПЛАТНЫХ ПРОКСИ",11,0xffdedede);sourceHeading.setLetterSpacing(.08f);page.addView(sourceHeading);space(page,8);Button sourcePicker=button(sourceLabel()+"  ▾",false);sourcePicker.setOnClickListener(v->chooseSources(sourcePicker));page.addView(sourcePicker);
   space(page,20);LinearLayout links=new LinearLayout(this);Button help=button("Хелпинг",false),about=button("Факинг",false);help.setOnClickListener(v->showHelp());about.setOnClickListener(v->showAbout());LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(0,dp(50),1);hp.rightMargin=dp(8);links.addView(help,hp);links.addView(about,new LinearLayout.LayoutParams(0,dp(50),1));page.addView(links);offerUpdate();
@@ -97,9 +94,20 @@ public class MainActivity extends Activity {
   startActivity(new Intent(this,PanelActivity.class));
  }
  void showHelp(){new AlertDialog.Builder(this).setTitle("Хелпинг").setMessage("Халява\nПри первом входе загрузит выбранные источники и проверит пинг. «Обновить список» получает свежие адреса, «Проверить» обновляет пинг. «Давай!» выбирает самый быстрый, «Хочу!» — конкретный прокси. «Стопэ» отменяет проверку.\n\nМанул\nВставьте одну или несколько ссылок tg://proxy, t.me/proxy или t.me/webproxy. Можно импортировать списки из источников. Ссылки сохраняются отдельно; повторный импорт добавляет новые, сохраняя ваши.\n\nМой VPS\nКнопка «Жупень» открывает свой сервер. Укажите HTTPS-адрес и пароль панели, затем токен dynv6 и почту. Создайте прокси и откройте готовое подключение в Telegram.\n\nПинг — время TCP-соединения, а не гарантия работы Telegram. Подключение подтверждается в Telegram. При запуске проверяется новая версия APK; установка — с вашего согласия.").setPositiveButton("Понятно",null).show();}
- void showAbout(){new AlertDialog.Builder(this).setTitle("Факинг").setMessage("MTPoxyЁкси\nЭто вам не это\n\nАвтор проекта: riehnh.\nИсходники, установка панели и документация — в GitHub.").setPositiveButton("Открыть GitHub",(d,w)->startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://github.com/riehnh/mtpoxy-panel")))).setNegativeButton("Закрыть",null).show();}
- void checkUpdates(){Thread thread=new Thread(()->{try{CancellableOperation check=new CancellableOperation();org.json.JSONObject info=new org.json.JSONObject(download("https://raw.githubusercontent.com/riehnh/mtpoxy-panel/main/updates/latest.json",check));int installed=getPackageManager().getPackageInfo(getPackageName(),0).versionCode;if(!getPackageName().equals(info.optString("package"))||!UpdateVersion.newer(installed,info.getInt("version_code")))return;String name=info.getString("version_name");ui(()->{pendingVersion=name;offerUpdate();});}catch(Exception ignored){}},"update-check");thread.setDaemon(true);thread.start();}
- void offerUpdate(){if(!foreground||pendingVersion.isEmpty()||updateOffered||busy||screen!=Screen.HOME||isFinishing()||isDestroyed())return;updateOffered=true;new AlertDialog.Builder(this).setTitle("Есть обновление · "+pendingVersion).setMessage("Скачать новую версию Ёкси из репозитория автора? После скачивания подтвердите установку APK в Android. Сохранённые настройки останутся.").setPositiveButton("Обновить",(d,w)->{try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://github.com/riehnh/mtpoxy-panel/raw/refs/heads/main/downloads/MTPoxy.apk")));}catch(ActivityNotFoundException e){Toast.makeText(this,"Для скачивания нужен браузер",Toast.LENGTH_LONG).show();}}).setNegativeButton("Позже",null).show();}
+ boolean autoUpdates(){return getPreferences(0).getBoolean("check_updates",true);}
+ void showAbout(){
+  LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(22),dp(12),dp(22),dp(12));String version="";try{android.content.pm.PackageInfo info=getPackageManager().getPackageInfo(getPackageName(),0);version=info.versionName+" · сборка "+info.versionCode;}catch(Exception ignored){}
+  content.addView(text("MTPoxyЁкси",22,0xfff8f8f8));space(content,8);content.addView(text("Версия "+version,14,0xffffb44d));space(content,12);content.addView(text("Это вам не это\n\nАвтор проекта: riehnh.\nИсходники, установка и документация — в GitHub.",14,0xffdedede));space(content,16);
+  CheckBox automatic=new CheckBox(this);automatic.setText("Проверять обновление");automatic.setTextColor(0xfff8f8f8);automatic.setChecked(autoUpdates());automatic.setOnCheckedChangeListener((v,checked)->{getPreferences(0).edit().putBoolean("check_updates",checked).apply();if(!checked&&!pendingUpdateManual)pendingVersion="";});content.addView(automatic);
+  aboutCheckButton=button("Проверить обновление",true);aboutCheckButton.setEnabled(!updateChecking);aboutCheckButton.setOnClickListener(v->checkUpdates(true));content.addView(aboutCheckButton,new LinearLayout.LayoutParams(-1,dp(50)));aboutUpdateStatus=text(updateChecking?"Проверяем…":"",13,0xffdedede);content.addView(aboutUpdateStatus);
+  ScrollView scroll=new ScrollView(this);scroll.addView(content);aboutDialog=new AlertDialog.Builder(this).setTitle("Факинг").setView(scroll).setPositiveButton("Открыть GitHub",(d,w)->{try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://github.com/riehnh/mtpoxy-panel")));}catch(ActivityNotFoundException e){Toast.makeText(this,"Нужен браузер",Toast.LENGTH_LONG).show();}}).setNegativeButton("Закрыть",null).create();aboutDialog.setOnDismissListener(d->offerUpdate());aboutDialog.show();
+ }
+ void updateStatus(String value){if(aboutUpdateStatus!=null)aboutUpdateStatus.setText(value);}
+ void checkUpdates(boolean manual){
+  if(!UpdateVersion.shouldCheck(autoUpdates(),manual))return;manualUpdateRequested|=manual;if(updateChecking){updateStatus("Проверка уже выполняется…");return;}updateChecking=true;if(aboutCheckButton!=null)aboutCheckButton.setEnabled(false);updateStatus("Проверяем обновления…");
+  Thread thread=new Thread(()->{try{CancellableOperation check=new CancellableOperation();org.json.JSONObject info=new org.json.JSONObject(download("https://raw.githubusercontent.com/riehnh/mtpoxy-panel/main/updates/latest.json",check));int installed=getPackageManager().getPackageInfo(getPackageName(),0).versionCode;if(!getPackageName().equals(info.optString("package")))throw new IOException("Неверный пакет обновления");boolean newer=UpdateVersion.newer(installed,info.getInt("version_code"));String name=info.getString("version_name");ui(()->{boolean requested=manualUpdateRequested;manualUpdateRequested=false;updateChecking=false;if(aboutCheckButton!=null)aboutCheckButton.setEnabled(true);if(!UpdateVersion.shouldCheck(autoUpdates(),requested)){updateStatus("Автопроверка отключена.");return;}if(newer){pendingVersion=name;pendingUpdateManual=requested;if(requested)updateOffered=false;updateStatus("Доступна версия "+name);offerUpdate();}else{pendingVersion="";updateStatus("Установлена последняя версия.");}});}catch(Exception ignored){ui(()->{boolean requested=manualUpdateRequested;manualUpdateRequested=false;updateChecking=false;if(aboutCheckButton!=null)aboutCheckButton.setEnabled(true);if(requested||(aboutDialog!=null&&aboutDialog.isShowing()))updateStatus("Не удалось проверить. Проверьте интернет и попробуйте ещё раз.");});}},"update-check");thread.setDaemon(true);thread.start();
+ }
+ void offerUpdate(){if(!pendingUpdateManual&&!autoUpdates()){pendingVersion="";return;}if(!foreground||pendingVersion.isEmpty()||updateOffered||busy||screen!=Screen.HOME||isFinishing()||isDestroyed())return;if(aboutDialog!=null&&aboutDialog.isShowing()&&!pendingUpdateManual)return;updateOffered=true;if(aboutDialog!=null&&aboutDialog.isShowing())aboutDialog.dismiss();new AlertDialog.Builder(this).setTitle("Есть обновление · "+pendingVersion).setMessage("Скачать новую версию Ёкси из репозитория автора? После скачивания подтвердите установку APK в Android. Сохранённые настройки останутся.").setPositiveButton("Обновить",(d,w)->{try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://github.com/riehnh/mtpoxy-panel/raw/refs/heads/main/downloads/MTPoxy.apk")));}catch(ActivityNotFoundException e){Toast.makeText(this,"Для скачивания нужен браузер",Toast.LENGTH_LONG).show();}}).setNegativeButton("Позже",null).show();}
  void showAutomatic(){showAutomatic(true);}
  void showAutomatic(boolean loadIfEmpty){
   screen=Screen.FREE;visibleFree=60;LinearLayout page=modePage();Button back=UiKit.homeButton(this,()->onBackPressed());page.addView(back);space(page,12);page.addView(text("Халява",25,0xfff8f8f8));space(page,12);
@@ -231,6 +239,7 @@ public class MainActivity extends Activity {
  @Override protected void onPause(){foreground=false;super.onPause();}
  @Override protected void onDestroy(){stopped=true;if(operation!=null)operation.cancel();io.shutdownNow();if(probes!=null)probes.shutdownNow();super.onDestroy();}
 }
+
 
 
 
