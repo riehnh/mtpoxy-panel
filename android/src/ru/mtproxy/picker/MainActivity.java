@@ -25,12 +25,14 @@ public class MainActivity extends Activity {
  Screen screen=Screen.HOME;
  int candidateIndex, candidateCount;
  String failedSources="";
- enum Screen { HOME, MANUAL, AUTOMATIC }
+ enum Screen { HOME, MANUAL, FREE, AUTOMATIC }
+ LinearLayout freeRows;Button refreshFree,checkFree,bestFree;int visibleFree=60;
+ final ArrayList<Proxy> candidates=new ArrayList<>();
  final ArrayList<Proxy> proxies=new ArrayList<>();
  final ExecutorService io=Executors.newSingleThreadExecutor();
  ExecutorService probes; boolean busy=false, ascending=true; volatile boolean stopped=false;
  TextView status,summary; Button load,ping,sort; LinearLayout rows; ProgressBar progress;
- static class Proxy { String host,secret; int port; volatile long ms=-2; Proxy(String h,int p,String s){host=h;port=p;secret=s;} }
+ static class Proxy { String host,secret; int port; volatile long ms=-2; volatile long checkedAt=0; Proxy(String h,int p,String s){host=h;port=p;secret=s;} }
  int dp(int n){return (int)(getResources().getDisplayMetrics().density*n);}
  TextView text(String s,int size,int color){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setFontFeatureSettings("kern");return t;}
  android.graphics.drawable.GradientDrawable rounded(int color,int radius){android.graphics.drawable.GradientDrawable d=new android.graphics.drawable.GradientDrawable();d.setColor(color);d.setCornerRadius(0);return d;}
@@ -47,7 +49,7 @@ public class MainActivity extends Activity {
   status=text("Начните с загрузки списка — мы найдём доступные адреса.",13,0xffdedede);status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);root.addView(status);space(root,14);summary=text("ВАШИ ПРОКСИ",12,0xffdedede);summary.setLetterSpacing(0.10f);summary.setTypeface(null,1);root.addView(summary);space(root,8);
   ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(0xff343434);rows=new LinearLayout(this);rows.setOrientation(1);root.addView(rows,new LinearLayout.LayoutParams(-1,-2));scroll.addView(root,new ScrollView.LayoutParams(-1,-2));setContentView(scroll);
   load.setOnClickListener(v->fetch());ping.setOnClickListener(v->probe());sort.setOnClickListener(v->{ascending=!ascending;order();render();});
-  String cache=getPreferences(0).getString("list","");parse(cache,proxies);render();if(!proxies.isEmpty())status.setText("Сохранённый список: "+proxies.size()+". Обновите перед проверкой.");enable();
+  String cache=getPreferences(0).getString("list","");parse(cache,proxies);restorePings();render();if(!proxies.isEmpty())status.setText("Сохранённый список: "+proxies.size()+". Обновите перед проверкой.");enable();
   manualScreen=scroll;
   manualProgress=progress;
   manualStatus=status;
@@ -88,35 +90,27 @@ public class MainActivity extends Activity {
   startActivity(new Intent(this,PanelActivity.class));
  }
  void showAutomatic(){
-  screen=Screen.AUTOMATIC;
-  LinearLayout page=modePage();
-  Button back=button("← На главный экран",false);
-  back.setOnClickListener(v->onBackPressed());
-  page.addView(back);
-  space(page,16);
-  status=text("",14,0xffdedede);
-  status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
-  page.addView(status);
-  progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
-  page.addView(progress);
-  dice=new DiceView();
-  page.addView(dice,new LinearLayout.LayoutParams(-1,dp(156)));
-  automaticResults=new LinearLayout(this);
-  automaticResults.setOrientation(1);
-  page.addView(automaticResults);
-  retry=button("Проверить заново",false);
-  retry.setOnClickListener(v->startAutomatic());
-  page.addView(retry);
-  startAutomatic();
+  screen=Screen.FREE;visibleFree=60;LinearLayout page=modePage();Button back=button("← На главный экран",false);back.setOnClickListener(v->onBackPressed());page.addView(back);space(page,12);page.addView(text("Халява",25,0xfff8f8f8));space(page,12);
+  refreshFree=button("Обновить список",true);refreshFree.setOnClickListener(v->{if(!busy)fetch();});page.addView(refreshFree);space(page,8);
+  LinearLayout actions=new LinearLayout(this);checkFree=button("Проверить",false);bestFree=button("Выбрать!",false);checkFree.setOnClickListener(v->{if(!busy)probe();});bestFree.setOnClickListener(v->openCandidates(null));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(48),1);lp.rightMargin=dp(8);actions.addView(checkFree,lp);actions.addView(bestFree,new LinearLayout.LayoutParams(0,dp(48),1));page.addView(actions);space(page,12);
+  status=text("",13,0xffdedede);page.addView(status);progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setVisibility(View.GONE);page.addView(progress);dice=new DiceView();dice.setVisibility(View.GONE);page.addView(dice,new LinearLayout.LayoutParams(-1,dp(100)));freeRows=new LinearLayout(this);freeRows.setOrientation(1);page.addView(freeRows);renderFree();enable();if(proxies.isEmpty())fetch();else status.setText("Сохранённые результаты · "+proxies.size()+". «Проверить» обновит пинг.");
  }
- void startAutomatic(){
-  automaticResults.removeAllViews();
-  retry.setVisibility(View.GONE);
-  dice.setVisibility(View.VISIBLE);
-  candidateIndex=0;
-  candidateCount=0;
-  fetch();
+ void renderFree(){
+  if(freeRows==null)return;freeRows.removeAllViews();int count=Math.min(visibleFree,proxies.size());
+  for(int i=0;i<count;i++){Proxy p=proxies.get(i);LinearLayout row=new LinearLayout(this);row.setOrientation(1);row.setPadding(dp(14),dp(12),dp(14),dp(12));row.setBackgroundColor(0xff454545);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.topMargin=dp(10);freeRows.addView(row,rp);row.addView(text(p.host+":"+p.port,16,0xfff8f8f8));row.addView(text(p.ms>=0?p.ms+" мс · "+android.text.format.DateFormat.format("dd.MM HH:mm",p.checkedAt):p.ms==-1?"Не ответил при последней проверке":"Ещё не проверен",13,p.ms>=0?0xffffb44d:0xffdedede));Button want=button("Хочу!",false);want.setEnabled(!busy);want.setOnClickListener(v->openCandidates(p));row.addView(want);}
+  if(count<proxies.size()){Button more=button("Показать ещё · "+(proxies.size()-count),false);more.setOnClickListener(v->{visibleFree+=60;renderFree();});freeRows.addView(more);}
  }
+ static ArrayList<Proxy> candidateList(List<Proxy> list,Proxy wanted){ArrayList<Proxy> result=new ArrayList<>();for(Proxy p:list)if(p.ms>=0&&p!=wanted)result.add(p);result.sort((a,b)->Long.compare(a.ms,b.ms));if(wanted!=null)result.add(0,wanted);return result;}
+ void openCandidates(Proxy wanted){
+  if(busy)return;candidates.clear();candidates.addAll(candidateList(proxies,wanted));
+  if(candidates.isEmpty()){Toast.makeText(this,"Сначала нажмите «Проверить»: нет доступных вариантов",Toast.LENGTH_LONG).show();return;}
+  screen=Screen.AUTOMATIC;candidateIndex=0;candidateCount=candidates.size();LinearLayout page=modePage();Button back=button("← К списку",false);back.setOnClickListener(v->onBackPressed());page.addView(back);space(page,16);status=text("",14,0xffdedede);page.addView(status);progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setVisibility(View.GONE);page.addView(progress);automaticResults=new LinearLayout(this);automaticResults.setOrientation(1);page.addView(automaticResults);recheckCandidate();
+ }
+ void recheckCandidate(){
+  Proxy p=candidates.get(candidateIndex);busy=true;automaticResults.removeAllViews();status.setText("Проверяем "+p.host+"…");progress.setIndeterminate(true);progress.setVisibility(View.VISIBLE);io.execute(()->{ProbeEngine.refreshDns();long value=ProbeEngine.measure(p.host,p.port,2000);ui(()->{p.ms=value;p.checkedAt=System.currentTimeMillis();busy=false;progress.setVisibility(View.GONE);progress.setIndeterminate(false);savePings();showCandidate();});});
+ }
+ void restorePings(){try{org.json.JSONObject saved=new org.json.JSONObject(getPreferences(0).getString("pings","{}"));for(Proxy p:proxies){org.json.JSONArray row=saved.optJSONArray(proxyUri(p).toString());if(row!=null){p.ms=row.getLong(0);p.checkedAt=row.getLong(1);}}}catch(Exception ignored){}}
+ void savePings(){try{org.json.JSONObject saved=new org.json.JSONObject();for(Proxy p:proxies)saved.put(proxyUri(p).toString(),new org.json.JSONArray().put(p.ms).put(p.checkedAt));getPreferences(0).edit().putString("pings",saved.toString()).apply();}catch(Exception ignored){}}
  final class DiceView extends View {
   private final android.graphics.Paint paint=new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
   private final int[][] faces={{4},{0,8},{0,4,8},{0,2,6,8},{0,2,4,6,8},{0,2,3,5,6,8}};
@@ -154,7 +148,7 @@ public class MainActivity extends Activity {
  void showCandidate(){
   automaticResults.removeAllViews();
   if(candidateCount==0)return;
-  Proxy candidate=proxies.get(candidateIndex);
+  Proxy candidate=candidates.get(candidateIndex);
   LinearLayout card=new LinearLayout(this);
   card.setOrientation(1);
   card.setPadding(dp(16),dp(16),dp(16),dp(16));
@@ -162,9 +156,10 @@ public class MainActivity extends Activity {
   card.addView(text("Вариант "+(candidateIndex+1)+" из "+candidateCount,13,0xffdedede));
   space(card,8);
   card.addView(text(candidate.host+" · порт "+candidate.port,17,0xfff6f0ea));
-  card.addView(text(candidate.ms+" мс",26,0xffff8a2b));
+  card.addView(text(candidate.ms>=0?candidate.ms+" мс":"Прокси сейчас не отвечает",26,0xffff8a2b));
   space(card,16);
   Button push=button("Пихаем",true);
+  push.setEnabled(candidate.ms>=0);
   push.setOnClickListener(v->connect(candidate));
   card.addView(push);
   space(card,8);
@@ -172,7 +167,7 @@ public class MainActivity extends Activity {
   boolean hasNext=candidateIndex+1<candidateCount;
   next.setEnabled(hasNext);
   next.setAlpha(hasNext?1f:.45f);
-  next.setOnClickListener(v->{candidateIndex++;showCandidate();});
+  next.setOnClickListener(v->{candidateIndex++;recheckCandidate();});
   card.addView(next);
   if(!hasNext){
    space(card,8);
@@ -186,113 +181,28 @@ public class MainActivity extends Activity {
    return;
   }
   if(screen==Screen.HOME)super.onBackPressed();
+  else if(screen==Screen.AUTOMATIC)showAutomatic();
   else showHome();
  }
  static String query(java.net.URI u,String name)throws Exception {String q=u.getRawQuery();if(q==null)return null;for(String part:q.split("&")){String[] pair=part.split("=",2);if(pair.length==2&&name.equals(pair[0]))return java.net.URLDecoder.decode(pair[1],"UTF-8");}return null;}
  static boolean validSecret(String s){if(s==null||s.length()>1024)return false;byte[] bytes;try{if(s.matches("(?i)[a-f0-9]+")&&s.length()%2==0){bytes=new byte[s.length()/2];for(int i=0;i<bytes.length;i++)bytes[i]=(byte)Integer.parseInt(s.substring(i*2,i*2+2),16);}else{if(!s.matches("[A-Za-z0-9_-]+={0,2}"))return false;bytes=java.util.Base64.getUrlDecoder().decode(s);}return bytes.length==16||(bytes.length==17&&(bytes[0]&255)==221)||(bytes.length>=18&&(bytes[0]&255)==238);}catch(Exception e){return false;}}
  static void parse(String data,List<Proxy> out){Set<String> seen=new HashSet<>();for(Proxy old:out)seen.add(old.host+":"+old.port+":"+old.secret);for(String line:data.split("\\r?\\n")){try{java.net.URI u=new java.net.URI(line.trim());if(!(("tg".equals(u.getScheme())&&"proxy".equals(u.getHost()))||("https".equals(u.getScheme())&&"t.me".equals(u.getHost())&&"/proxy".equals(u.getPath()))))continue;String h=query(u,"server"),s=query(u,"secret");int p=Integer.parseInt(query(u,"port"));if(h==null||h.isEmpty()||h.length()>253||!h.matches("[A-Za-z0-9.:-]+")||!validSecret(s)||p<1||p>65535)continue;h=h.toLowerCase(Locale.ROOT);if(h.endsWith("."))h=h.substring(0,h.length()-1);if(out.size()>=3000)break;if(seen.add(h+":"+p+":"+s))out.add(new Proxy(h,p,s));}catch(Exception ignored){}}}
  String sourceLabel(){ArrayList<String> names=new ArrayList<>();for(int i=0;i<selected.length;i++)if(selected[i])names.add(SOURCE_NAMES[i]);return android.text.TextUtils.join(" + ",names);}
- void chooseSources(Button trigger){final boolean[] draft=selected.clone();AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Источники прокси").setMultiChoiceItems(SOURCE_NAMES,draft,(d,index,checked)->draft[index]=checked).setNegativeButton("Отмена",null).setPositiveButton("Сохранить",null).create();dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(w->{boolean any=false;for(boolean b:draft)any|=b;if(!any){Toast.makeText(this,"Выберите хотя бы один источник",Toast.LENGTH_SHORT).show();return;}if(!Arrays.equals(selected,draft)){selected=draft;android.content.SharedPreferences.Editor editor=getPreferences(0).edit();for(int i=0;i<selected.length;i++)editor.putBoolean("source_"+i,selected[i]);editor.remove("list").apply();proxies.clear();render();manualStatus.setText("Источники выбраны. Тыкните «Получить список».");enable();}sources.setText("Источники · "+sourceLabel()+"  ▾");trigger.setText(sources.getText());dialog.dismiss();}));dialog.show();}
+ void chooseSources(Button trigger){final boolean[] draft=selected.clone();AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Источники прокси").setMultiChoiceItems(SOURCE_NAMES,draft,(d,index,checked)->draft[index]=checked).setNegativeButton("Отмена",null).setPositiveButton("Сохранить",null).create();dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(w->{boolean any=false;for(boolean b:draft)any|=b;if(!any){Toast.makeText(this,"Выберите хотя бы один источник",Toast.LENGTH_SHORT).show();return;}if(!Arrays.equals(selected,draft)){selected=draft;android.content.SharedPreferences.Editor editor=getPreferences(0).edit();for(int i=0;i<selected.length;i++)editor.putBoolean("source_"+i,selected[i]);editor.remove("list").remove("pings").apply();proxies.clear();render();manualStatus.setText("Источники выбраны. Тыкните «Получить список».");enable();}sources.setText("Источники · "+sourceLabel()+"  ▾");trigger.setText(sources.getText());dialog.dismiss();}));dialog.show();}
  void ui(Runnable r){if(!stopped)runOnUiThread(()->{if(!stopped)r.run();});}
- void enable(){sources.setEnabled(!busy);sources.setAlpha(busy?.45f:1f);load.setEnabled(!busy);ping.setEnabled(!busy&&!proxies.isEmpty());sort.setEnabled(!busy&&!proxies.isEmpty());load.setAlpha(busy?.45f:1f);ping.setAlpha(ping.isEnabled()?1f:.4f);sort.setAlpha(sort.isEnabled()?1f:.4f);load.setText(proxies.isEmpty()?"↓  Получить список":"↻  Обновить список");}
+ void enable(){if(refreshFree!=null){refreshFree.setEnabled(!busy);checkFree.setEnabled(!busy&&!proxies.isEmpty());bestFree.setEnabled(!busy&&proxies.stream().anyMatch(p->p.ms>=0));}sources.setEnabled(!busy);sources.setAlpha(busy?.45f:1f);load.setEnabled(!busy);ping.setEnabled(!busy&&!proxies.isEmpty());sort.setEnabled(!busy&&!proxies.isEmpty());load.setAlpha(busy?.45f:1f);ping.setAlpha(ping.isEnabled()?1f:.4f);sort.setAlpha(sort.isEnabled()?1f:.4f);load.setText(proxies.isEmpty()?"↓  Получить список":"↻  Обновить список");}
  static String download(String url)throws Exception{HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection();try{c.setConnectTimeout(12000);c.setReadTimeout(12000);c.setRequestProperty("User-Agent","Yoxy/1.6");if(c.getResponseCode()!=200)throw new IOException("HTTP "+c.getResponseCode());ByteArrayOutputStream bytes=new ByteArrayOutputStream();try(InputStream in=c.getInputStream()){byte[] b=new byte[4096];int n;while((n=in.read(b))!=-1){bytes.write(b,0,n);if(bytes.size()>1024*1024)throw new IOException("Список слишком большой");}}return bytes.toString("UTF-8");}finally{c.disconnect();}}
  void fetch(){
-  busy=true;
-  enable();
-  progress.setIndeterminate(true);
-  progress.setVisibility(View.VISIBLE);
-  status.setText("Собираем варианты для тыкания…");
-  final boolean[] requested=selected.clone();
-  io.execute(()->{
-   ArrayList<Proxy> next=new ArrayList<>();
-   ArrayList<String> failed=new ArrayList<>();
-   for(int i=0;i<requested.length;i++){
-    if(stopped)return;
-    if(!requested[i])continue;
-    final String name=SOURCE_NAMES[i];
-    ui(()->status.setText("Загружаем · "+name));
-    try{
-     ArrayList<Proxy> entries=new ArrayList<>();
-     String raw=download(SOURCE_URLS[i]);
-     parse(raw,entries);
-     if(entries.isEmpty())throw new IOException("Пустой список");
-     parse(raw,next);
-    }catch(Exception e){failed.add(name);}
-   }
-   StringBuilder cache=new StringBuilder();
-   for(Proxy proxy:next)cache.append(proxyUri(proxy)).append('\n');
-   ui(()->{
-    busy=false;
-    progress.setVisibility(View.GONE);
-    progress.setIndeterminate(false);
-    boolean automatic=screen==Screen.AUTOMATIC;
-    failedSources=android.text.TextUtils.join(", ",failed);
-    if(next.isEmpty()){
-     status.setText("Не удалось загрузить: "+failedSources+". Попробуйте ещё раз.");
-     if(automatic){
-      dice.setVisibility(View.GONE);
-      retry.setVisibility(View.VISIBLE);
-     }
-     enable();
-     return;
-    }
-    proxies.clear();
-    proxies.addAll(next);
-    getPreferences(0).edit().putString("list",cache.toString()).apply();
-    if(automatic){
-     probe();
-    }else{
-     render();
-     status.setText("Найдено: "+next.size()+". Потыкайте проверку пинга."+sourceErrors());
-     enable();
-    }
-   });
+  if(busy)return;busy=true;enable();progress.setIndeterminate(true);progress.setVisibility(View.VISIBLE);status.setText("Загружаем источники…");if(screen==Screen.FREE){dice.setVisibility(View.VISIBLE);renderFree();}final boolean[] requested=selected.clone();
+  io.execute(()->{ArrayList<Proxy> next=new ArrayList<>();ArrayList<String> failed=new ArrayList<>();ExecutorService downloads=Executors.newFixedThreadPool(3);ArrayList<Future<String>> futures=new ArrayList<>();ArrayList<Integer> names=new ArrayList<>();for(int i=0;i<requested.length;i++)if(requested[i]){final int index=i;names.add(i);futures.add(downloads.submit(()->download(SOURCE_URLS[index])));}try{for(int i=0;i<futures.size();i++){try{String raw=futures.get(i).get(25,TimeUnit.SECONDS);ArrayList<Proxy> entries=new ArrayList<>();parse(raw,entries);if(entries.isEmpty())throw new IOException();parse(raw,next);}catch(Exception e){failed.add(SOURCE_NAMES[names.get(i)]);}}}finally{downloads.shutdownNow();}
+   StringBuilder cache=new StringBuilder();for(Proxy p:next)cache.append(proxyUri(p)).append('\n');ui(()->{busy=false;progress.setVisibility(View.GONE);progress.setIndeterminate(false);failedSources=android.text.TextUtils.join(", ",failed);if(next.isEmpty()){status.setText("Не удалось обновить список. Прежние результаты сохранены."+sourceErrors());if(screen==Screen.FREE){dice.setVisibility(View.GONE);renderFree();}enable();return;}proxies.clear();proxies.addAll(next);getPreferences(0).edit().putString("list",cache.toString()).remove("pings").apply();if(screen==Screen.FREE)probe();else{render();status.setText("Найдено: "+next.size()+". Нажмите проверку пинга."+sourceErrors());enable();}});
   });
  }
  String sourceErrors(){return failedSources.isEmpty()?"":" Не загрузились: "+failedSources+".";}
- static long measure(Proxy p){long best=Long.MAX_VALUE;try{InetAddress[] addresses=InetAddress.getAllByName(p.host);for(InetAddress a:addresses){if(a.isAnyLocalAddress()||a.isLoopbackAddress()||a.isLinkLocalAddress()||a.isSiteLocalAddress()||a.isMulticastAddress())return -1;}for(int i=0;i<2;i++){long start=System.nanoTime();try(Socket s=new Socket()){s.connect(new InetSocketAddress(addresses[i%addresses.length],p.port),2000);best=Math.min(best,Math.max(1,(System.nanoTime()-start)/1000000));}catch(IOException ignored){}}}catch(Exception ignored){}return best==Long.MAX_VALUE?-1:best;}
+ static long measure(Proxy p){return ProbeEngine.measure(p.host,p.port,1500);}
  void probe(){
-  busy=true;
-  enable();
-  boolean automatic=screen==Screen.AUTOMATIC;
-  for(Proxy proxy:proxies)proxy.ms=-2;
-  if(!automatic)render();
-  final int total=proxies.size();
-  progress.setMax(total);
-  progress.setProgress(0);
-  progress.setVisibility(View.VISIBLE);
-  status.setText("Проверка 0 / "+total);
-  probes=Executors.newFixedThreadPool(12);
-  int[] completed={0};
-  for(Proxy proxy:new ArrayList<>(proxies)){
-   probes.execute(()->{
-    if(stopped)return;
-    proxy.ms=measure(proxy);
-    ui(()->{
-     int done=++completed[0];
-     progress.setProgress(done);
-     status.setText("Проверено "+done+" / "+total);
-     if(done!=total)return;
-     busy=false;
-     ascending=true;
-     order();
-     enable();
-     progress.setVisibility(View.GONE);
-     int available=(int)proxies.stream().filter(p->p.ms>=0).count();
-     if(automatic){
-      dice.setVisibility(View.GONE);
-      candidateCount=available;
-      status.setText((available==0?"Ни один прокси не ответил.":"Доступно "+available+" из "+total+". Сначала самые быстрые.")+sourceErrors());
-      if(available==0)retry.setVisibility(View.VISIBLE);
-      showCandidate();
-     }else{
-      render();
-      status.setText("Готово: доступны "+available+" из "+total+". Самые быстрые сверху.");
-     }
-    });
-   });
-  }
-  probes.shutdown();
+  if(busy||proxies.isEmpty())return;busy=true;enable();final boolean free=screen==Screen.FREE;for(Proxy p:proxies){p.ms=-2;p.checkedAt=0;}if(free){renderFree();dice.setVisibility(View.VISIBLE);}else render();ProbeEngine.refreshDns();final ArrayList<Proxy> batch=new ArrayList<>(proxies);final int total=batch.size();progress.setIndeterminate(false);progress.setMax(total);progress.setProgress(0);progress.setVisibility(View.VISIBLE);status.setText("Проверка 0 / "+total);probes=Executors.newFixedThreadPool(32);final java.util.concurrent.atomic.AtomicInteger completed=new java.util.concurrent.atomic.AtomicInteger();final ConcurrentHashMap<String,CompletableFuture<Long>> endpoints=new ConcurrentHashMap<>();
+  for(Proxy p:batch)probes.execute(()->{if(stopped)return;String key=p.host+":"+p.port;CompletableFuture<Long> own=new CompletableFuture<>();CompletableFuture<Long> previous=endpoints.putIfAbsent(key,own);long ms=-1;if(previous==null){ms=measure(p);own.complete(ms);}else try{ms=previous.get(4,TimeUnit.SECONDS);}catch(Exception ignored){}p.ms=ms;p.checkedAt=System.currentTimeMillis();int done=completed.incrementAndGet();if(done==total||done%16==0)ui(()->{if(done<progress.getProgress())return;progress.setProgress(done);status.setText("Проверено "+done+" / "+total);if(done!=total)return;busy=false;ascending=true;order();savePings();enable();progress.setVisibility(View.GONE);int available=(int)proxies.stream().filter(v->v.ms>=0).count();if(free){dice.setVisibility(View.GONE);renderFree();}else render();status.setText("Доступно "+available+" из "+total+" · результаты сохранены."+sourceErrors());});});probes.shutdown();
  }
  void order(){Collections.sort(proxies,(a,b)->{if(a.ms<0||b.ms<0){if(a.ms<0&&b.ms<0)return a.host.compareTo(b.host);return a.ms<0?1:-1;}return ascending?Long.compare(a.ms,b.ms):Long.compare(b.ms,a.ms);});sort.setText(ascending?"По пингу ↑":"По пингу ↓");}
  void render(){rows.removeAllViews();summary.setText(proxies.isEmpty()?"ВАШИ ПРОКСИ":"ПРОКСИ · "+proxies.size());if(proxies.isEmpty()){LinearLayout empty=new LinearLayout(this);empty.setOrientation(1);empty.setGravity(Gravity.CENTER);empty.setPadding(dp(24),dp(28),dp(24),dp(28));empty.setBackground(rounded(0xff454545,20));TextView symbol=text("◎",40,0xffff8a2b);empty.addView(symbol);TextView label=text("Здесь появятся прокси",18,0xfff6f0ea);label.setTypeface(null,1);empty.addView(label);space(empty,8);TextView hint=text("Получите список, проверьте пинг\nи выберите самый быстрый.",14,0xffdedede);hint.setGravity(Gravity.CENTER);empty.addView(hint);rows.addView(empty);return;}for(Proxy p:proxies){LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(16),dp(16),dp(16),dp(14));card.setBackground(rounded(0xff454545,20));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(10);rows.addView(card,lp);TextView host=text(p.host,16,0xfff6f0ea);host.setTypeface(null,1);host.setMaxLines(2);host.setEllipsize(android.text.TextUtils.TruncateAt.END);card.addView(host);space(card,6);LinearLayout meta=new LinearLayout(this);meta.setGravity(Gravity.CENTER_VERTICAL);meta.addView(text("MTProto · порт "+p.port,12,0xffdedede),new LinearLayout.LayoutParams(0,-2,1));TextView badge=text(p.ms==-2?"Не проверен":p.ms<0?"Не отвечает":p.ms+" мс",12,p.ms>=0?0xffff8a2b:p.ms==-1?0xffffb69c:0xffdedede);badge.setPadding(dp(10),dp(5),dp(10),dp(5));badge.setBackground(rounded(p.ms>=0?0xff454545:0xff282522,10));meta.addView(badge);card.addView(meta);space(card,12);Button connect=button("Подключить  ↗",false);connect.setOnClickListener(v->connect(p));card.addView(connect,new LinearLayout.LayoutParams(-1,dp(46)));}TextView foot=text("Пинг измеряет TCP-соединение, а не работу MTProto. Добавление прокси подтвердите в Telegram.\n\nИсточники выбираются кнопкой выше.",12,0xffdedede);foot.setPadding(dp(4),dp(6),dp(4),dp(20));rows.addView(foot);}
