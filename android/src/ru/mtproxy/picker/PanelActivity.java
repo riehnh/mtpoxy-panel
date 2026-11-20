@@ -37,6 +37,7 @@ public class PanelActivity extends Activity {
         scroll.addView(page);setContentView(scroll);scroll.requestApplyInsets();
         ImageView logo=new ImageView(this);logo.setImageResource(getResources().getIdentifier("ic_launcher","drawable",getPackageName()));page.addView(logo,new LinearLayout.LayoutParams(dp(48),dp(56)));
         TextView title=text(heading,26);title.setTextColor(0xfff4f4f5);page.addView(title);status=text("",14);page.addView(status);
+        button("На главный экран",()->finish());
     }
     EditText field(String hint,String value,boolean secret){
         page.addView(text(hint,13));
