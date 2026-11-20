@@ -133,7 +133,7 @@ class Handler(BaseHTTPRequestHandler):
                                    'token_configured': bool(settings.get('dynv6_token'))})
             if path in ('/manage', '/manage/'):
                 return self.asset('panel.html')
-            if path in ('/manage/panel.js', '/manage/panel.css', '/manage/logo.svg'):
+            if path in ('/manage/panel.js', '/manage/panel.css', '/manage/logo.svg', '/manage/logo.png'):
                 return self.asset(path.rsplit('/', 1)[1])
             return self.reply({'error': 'Not found'}, 404)
         hostname = self.headers.get('Host', '').split(':')[0].lower()
@@ -143,7 +143,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(load_json(ROOT / 'recipes.json', {'recipes': []}))
         if path == '/':
             return self.asset('recipes.html')
-        if path in ('/recipes.js', '/recipes.css', '/logo.svg'):
+        if path in ('/recipes.js', '/recipes.css', '/logo.svg', '/logo.png'):
             return self.asset(path[1:])
         return self.reply(b'Page not found', 404, 'text/plain')
 

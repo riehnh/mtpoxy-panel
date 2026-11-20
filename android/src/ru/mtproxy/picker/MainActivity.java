@@ -33,19 +33,19 @@ public class MainActivity extends Activity {
  static class Proxy { String host,secret; int port; volatile long ms=-2; Proxy(String h,int p,String s){host=h;port=p;secret=s;} }
  int dp(int n){return (int)(getResources().getDisplayMetrics().density*n);}
  TextView text(String s,int size,int color){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setFontFeatureSettings("kern");return t;}
- android.graphics.drawable.GradientDrawable rounded(int color,int radius){android.graphics.drawable.GradientDrawable d=new android.graphics.drawable.GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
+ android.graphics.drawable.GradientDrawable rounded(int color,int radius){android.graphics.drawable.GradientDrawable d=new android.graphics.drawable.GradientDrawable();d.setColor(color);d.setCornerRadius(0);return d;}
  void space(LinearLayout l,int h){View v=new View(this);l.addView(v,new LinearLayout.LayoutParams(1,dp(h)));}
- Button button(String label,boolean primary){Button b=new Button(this);b.setText(label);b.setTextSize(14);b.setAllCaps(false);b.setTypeface(null,1);b.setTextColor(primary?0xff14100d:0xffff8a2b);b.setBackgroundTintList(null);b.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33ff8a2b),rounded(primary?0xffff8a2b:0xff302218,16),null));b.setMinHeight(dp(48));b.setMinimumHeight(dp(48));b.setPadding(dp(12),dp(8),dp(12),dp(8));return b;}
+ Button button(String label,boolean primary){Button b=new Button(this);b.setText(label);b.setTextSize(14);b.setAllCaps(false);b.setTypeface(null,1);b.setTextColor(primary?0xff343434:0xfff8f8f8);b.setBackgroundTintList(null);b.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33ff8a2b),rounded(primary?0xffffb44d:0xff555555,16),null));b.setMinHeight(dp(48));b.setMinimumHeight(dp(48));b.setPadding(dp(12),dp(8),dp(12),dp(8));return b;}
  @Override public void onCreate(Bundle b){super.onCreate(b);
-  LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setPadding(dp(20),dp(16),dp(20),0);root.setBackgroundColor(0xff101010);
+  LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setPadding(dp(20),dp(16),dp(20),0);root.setBackgroundColor(0xff343434);
   root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(dp(20),i.getSystemWindowInsetTop()+dp(16),dp(20),i.getSystemWindowInsetBottom());return i;});
-  LinearLayout brand=new LinearLayout(this);brand.setGravity(Gravity.CENTER_VERTICAL);ImageView logo=new ImageView(this);logo.setImageResource(getResources().getIdentifier("ic_launcher","drawable",getPackageName()));brand.addView(logo,new LinearLayout.LayoutParams(dp(48),dp(48)));LinearLayout title=new LinearLayout(this);title.setOrientation(1);title.setPadding(dp(12),0,0,0);TextView name=text("Ёкси",24,0xfff6f0ea);name.setTypeface(null,1);title.addView(name);title.addView(text("Это вам не это",13,0xffb2aaa4));brand.addView(title);root.addView(brand);space(root,20);
-  LinearLayout hero=new LinearLayout(this);hero.setOrientation(1);hero.setPadding(dp(20),dp(18),dp(20),dp(18));hero.setBackground(rounded(0xff302218,24));TextView heading=text("Выберите прокси",27,0xffffa45e);heading.setTypeface(null,1);hero.addView(heading);space(hero,8);hero.addView(text("Загрузите список и проверьте скорость соединения",14,0xffd6c0b0));space(hero,16);load=button("↓  Получить список",true);hero.addView(load,new LinearLayout.LayoutParams(-1,dp(50)));root.addView(hero);space(root,14);
+  LinearLayout brand=new LinearLayout(this);brand.setGravity(Gravity.CENTER_VERTICAL);ImageView logo=new ImageView(this);logo.setImageResource(getResources().getIdentifier("ic_launcher","drawable",getPackageName()));brand.addView(logo,new LinearLayout.LayoutParams(dp(48),dp(48)));LinearLayout title=new LinearLayout(this);title.setOrientation(1);title.setPadding(dp(12),0,0,0);TextView name=text("Ёкси",24,0xfff6f0ea);name.setTypeface(null,1);title.addView(name);title.addView(text("Это вам не это",13,0xffdedede));brand.addView(title);root.addView(brand);space(root,20);
+  LinearLayout hero=new LinearLayout(this);hero.setOrientation(1);hero.setPadding(dp(20),dp(18),dp(20),dp(18));hero.setBackground(rounded(0xffffb44d,0));TextView heading=text("Ручной выбор",24,0xff343434);heading.setTypeface(null,1);hero.addView(heading);space(hero,8);hero.addView(text("Загрузите список и проверьте соединение",14,0xff454545));space(hero,16);load=button("↓  Получить список",true);hero.addView(load,new LinearLayout.LayoutParams(-1,dp(50)));root.addView(hero);space(root,14);
   for(int i=0;i<selected.length;i++)selected[i]=getPreferences(0).getBoolean("source_"+i,i==0); sources=button("Источники · "+sourceLabel()+"  ▾",false);sources.setOnClickListener(v->chooseSources(sources));root.addView(sources,new LinearLayout.LayoutParams(-1,-2));space(root,10);
   LinearLayout actions=new LinearLayout(this);ping=button("◉  Проверить пинг",false);sort=button("По пингу ↑",false);LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(0,dp(48),1);ap.setMarginEnd(dp(8));actions.addView(ping,ap);actions.addView(sort,new LinearLayout.LayoutParams(0,dp(48),1));root.addView(actions);space(root,12);
   progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);root.addView(progress);progress.setVisibility(View.GONE);
-  status=text("Начните с загрузки списка — мы найдём доступные адреса.",13,0xffb2aaa4);status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);root.addView(status);space(root,14);summary=text("ВАШИ ПРОКСИ",12,0xffb2aaa4);summary.setLetterSpacing(0.10f);summary.setTypeface(null,1);root.addView(summary);space(root,8);
-  ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(0xff101010);rows=new LinearLayout(this);rows.setOrientation(1);root.addView(rows,new LinearLayout.LayoutParams(-1,-2));scroll.addView(root,new ScrollView.LayoutParams(-1,-2));setContentView(scroll);
+  status=text("Начните с загрузки списка — мы найдём доступные адреса.",13,0xffdedede);status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);root.addView(status);space(root,14);summary=text("ВАШИ ПРОКСИ",12,0xffdedede);summary.setLetterSpacing(0.10f);summary.setTypeface(null,1);root.addView(summary);space(root,8);
+  ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(0xff343434);rows=new LinearLayout(this);rows.setOrientation(1);root.addView(rows,new LinearLayout.LayoutParams(-1,-2));scroll.addView(root,new ScrollView.LayoutParams(-1,-2));setContentView(scroll);
   load.setOnClickListener(v->fetch());ping.setOnClickListener(v->probe());sort.setOnClickListener(v->{ascending=!ascending;order();render();});
   String cache=getPreferences(0).getString("list","");parse(cache,proxies);render();if(!proxies.isEmpty())status.setText("Сохранённый список: "+proxies.size()+". Обновите перед проверкой.");enable();
   manualScreen=scroll;
@@ -56,7 +56,7 @@ public class MainActivity extends Activity {
  LinearLayout modePage(){
   ScrollView scroll=new ScrollView(this);
   scroll.setFillViewport(true);
-  scroll.setBackgroundColor(0xff101010);
+  scroll.setBackgroundColor(0xff343434);
   LinearLayout page=new LinearLayout(this);
   page.setOrientation(1);
   page.setOnApplyWindowInsetsListener((v,i)->{
@@ -73,49 +73,17 @@ public class MainActivity extends Activity {
   return page;
  }
  void showHome(){
-  screen=Screen.HOME;
-  LinearLayout page=modePage();
-  Button sourcePicker=button("Источники · "+sourceLabel()+"  ▾",false);
-  sourcePicker.setOnClickListener(v->chooseSources(sourcePicker));
-  page.addView(sourcePicker);space(page,16);
-  LinearLayout center=new LinearLayout(this);
-  center.setOrientation(1);
-  center.setGravity(Gravity.CENTER);
-  center.setPadding(0,dp(12),0,dp(12));
-  center.setBackground(rounded(0xff1a1c1f,24));
-  page.addView(center,new LinearLayout.LayoutParams(-1,0,1));
-  DuckView duck=new DuckView(this);
-  duck.setContentDescription("Жупень. Панель моего VPS");
-  duck.setOnClickListener(v->openPanel());
-  center.addView(duck,new LinearLayout.LayoutParams(dp(144),dp(144)));
-  TextView duckName=text("Жупень",27,0xffff8a2b);
-  duckName.setTypeface(null,1);
-  duckName.setGravity(Gravity.CENTER);
-  duckName.setPadding(0,dp(10),0,dp(10));
-  duckName.setOnClickListener(v->openPanel());
-  center.addView(duckName);
-  center.addView(text("Управление своим VPS",14,0xffa6abb3));
-  space(page,18);
-  page.addView(text("БЕСПЛАТНЫЕ ПРОКСИ",12,0xffa6abb3));space(page,8);
-  Button free=button("Халява",false);
-  free.setOnClickListener(v->showAutomatic());
-  page.addView(free);
-  space(page,4);page.addView(text("Автоматически найти самый быстрый",13,0xffa6abb3));
-  space(page,8);
-  Button manual=button("Манул",false);
-  manual.setOnClickListener(v->{
-   screen=Screen.MANUAL;
-   status=manualStatus;
-   progress=manualProgress;
-   render();
-   enable();
-   if(!proxies.isEmpty()) status.setText("Прокси в списке · "+proxies.size());
-   setContentView(manualScreen);
-   manualScreen.requestApplyInsets();
-  });
-  page.addView(manual);
-  space(page,4);page.addView(text("Открыть список и выбрать вручную",13,0xffa6abb3));
+  screen=Screen.HOME;LinearLayout page=modePage();
+  TextView greeting=text("Подключение к Telegram",21,0xfff8f8f8);greeting.setTypeface(null,1);page.addView(greeting);space(page,6);page.addView(text("Свой сервер или бесплатный прокси — выберите способ.",14,0xffd7d7d7));space(page,20);
+  LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setGravity(Gravity.CENTER);panel.setPadding(dp(16),dp(14),dp(16),dp(16));panel.setBackgroundColor(0xffffb44d);page.addView(panel,new LinearLayout.LayoutParams(-1,-2));
+  TextView cap=text("МОЙ VPS",12,0xff454545);cap.setTypeface(null,1);panel.addView(cap);
+  DuckView duck=new DuckView(this);duck.setContentDescription("Жупень. Открыть свой VPS");duck.setOnClickListener(v->openPanel());panel.addView(duck,new LinearLayout.LayoutParams(dp(160),dp(160)));
+  Button own=button("Жупень  →",false);own.setOnClickListener(v->openPanel());panel.addView(own,new LinearLayout.LayoutParams(-1,dp(50)));space(panel,8);panel.addView(text("Создать прокси на своём сервере",13,0xff454545));space(page,16);
+  LinearLayout choices=new LinearLayout(this);LinearLayout free=tile("Халява","Автопоиск лучшего","↗",0xffff825d,()->showAutomatic());LinearLayout manual=tile("Манул","Выбрать из списка","≡",0xff94d9e8,()->openManual());LinearLayout.LayoutParams left=new LinearLayout.LayoutParams(0,-2,1);left.rightMargin=dp(8);choices.addView(free,left);choices.addView(manual,new LinearLayout.LayoutParams(0,-2,1));page.addView(choices);space(page,16);
+  TextView sourceHeading=text("ИСТОЧНИКИ БЕСПЛАТНЫХ ПРОКСИ",11,0xffdedede);sourceHeading.setLetterSpacing(.08f);page.addView(sourceHeading);space(page,8);Button sourcePicker=button(sourceLabel()+"  ▾",false);sourcePicker.setOnClickListener(v->chooseSources(sourcePicker));page.addView(sourcePicker);
  }
+ LinearLayout tile(String title,String detail,String symbol,int color,Runnable action){LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);tile.setPadding(dp(16),dp(14),dp(16),dp(16));tile.setBackgroundColor(color);TextView icon=text(symbol,25,0xff343434);tile.addView(icon);TextView label=text(title,20,0xff343434);label.setTypeface(null,1);tile.addView(label);space(tile,4);tile.addView(text(detail,12,0xff343434));tile.setClickable(true);tile.setFocusable(true);tile.setContentDescription(title+". "+detail);tile.setOnClickListener(v->action.run());return tile;}
+ void openManual(){screen=Screen.MANUAL;status=manualStatus;progress=manualProgress;render();enable();if(!proxies.isEmpty())status.setText("Прокси в списке · "+proxies.size());setContentView(manualScreen);manualScreen.requestApplyInsets();}
  void openPanel(){
   startActivity(new Intent(this,PanelActivity.class));
  }
@@ -126,7 +94,7 @@ public class MainActivity extends Activity {
   back.setOnClickListener(v->onBackPressed());
   page.addView(back);
   space(page,16);
-  status=text("",14,0xffb2aaa4);
+  status=text("",14,0xffdedede);
   status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
   page.addView(status);
   progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
@@ -190,8 +158,8 @@ public class MainActivity extends Activity {
   LinearLayout card=new LinearLayout(this);
   card.setOrientation(1);
   card.setPadding(dp(16),dp(16),dp(16),dp(16));
-  card.setBackground(rounded(0xff1c1b1a,20));
-  card.addView(text("Вариант "+(candidateIndex+1)+" из "+candidateCount,13,0xffb2aaa4));
+  card.setBackground(rounded(0xff454545,20));
+  card.addView(text("Вариант "+(candidateIndex+1)+" из "+candidateCount,13,0xffdedede));
   space(card,8);
   card.addView(text(candidate.host+" · порт "+candidate.port,17,0xfff6f0ea));
   card.addView(text(candidate.ms+" мс",26,0xffff8a2b));
@@ -208,7 +176,7 @@ public class MainActivity extends Activity {
   card.addView(next);
   if(!hasNext){
    space(card,8);
-   card.addView(text("Это последний доступный вариант.",13,0xffb2aaa4));
+   card.addView(text("Это последний доступный вариант.",13,0xffdedede));
   }
   automaticResults.addView(card);
  }
@@ -327,7 +295,7 @@ public class MainActivity extends Activity {
   probes.shutdown();
  }
  void order(){Collections.sort(proxies,(a,b)->{if(a.ms<0||b.ms<0){if(a.ms<0&&b.ms<0)return a.host.compareTo(b.host);return a.ms<0?1:-1;}return ascending?Long.compare(a.ms,b.ms):Long.compare(b.ms,a.ms);});sort.setText(ascending?"По пингу ↑":"По пингу ↓");}
- void render(){rows.removeAllViews();summary.setText(proxies.isEmpty()?"ВАШИ ПРОКСИ":"ПРОКСИ · "+proxies.size());if(proxies.isEmpty()){LinearLayout empty=new LinearLayout(this);empty.setOrientation(1);empty.setGravity(Gravity.CENTER);empty.setPadding(dp(24),dp(28),dp(24),dp(28));empty.setBackground(rounded(0xff1c1b1a,20));TextView symbol=text("◎",40,0xffff8a2b);empty.addView(symbol);TextView label=text("Здесь появятся прокси",18,0xfff6f0ea);label.setTypeface(null,1);empty.addView(label);space(empty,8);TextView hint=text("Получите список, проверьте пинг\nи выберите самый быстрый.",14,0xffb2aaa4);hint.setGravity(Gravity.CENTER);empty.addView(hint);rows.addView(empty);return;}for(Proxy p:proxies){LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(16),dp(16),dp(16),dp(14));card.setBackground(rounded(0xff1c1b1a,20));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(10);rows.addView(card,lp);TextView host=text(p.host,16,0xfff6f0ea);host.setTypeface(null,1);host.setMaxLines(2);host.setEllipsize(android.text.TextUtils.TruncateAt.END);card.addView(host);space(card,6);LinearLayout meta=new LinearLayout(this);meta.setGravity(Gravity.CENTER_VERTICAL);meta.addView(text("MTProto · порт "+p.port,12,0xffb2aaa4),new LinearLayout.LayoutParams(0,-2,1));TextView badge=text(p.ms==-2?"Не проверен":p.ms<0?"Не отвечает":p.ms+" мс",12,p.ms>=0?0xffff8a2b:p.ms==-1?0xffffb69c:0xffb2aaa4);badge.setPadding(dp(10),dp(5),dp(10),dp(5));badge.setBackground(rounded(p.ms>=0?0xff302218:0xff282522,10));meta.addView(badge);card.addView(meta);space(card,12);Button connect=button("Подключить  ↗",false);connect.setOnClickListener(v->connect(p));card.addView(connect,new LinearLayout.LayoutParams(-1,dp(46)));}TextView foot=text("Пинг измеряет TCP-соединение, а не работу MTProto. Добавление прокси подтвердите в Telegram.\n\nИсточники выбираются кнопкой выше.",12,0xffb2aaa4);foot.setPadding(dp(4),dp(6),dp(4),dp(20));rows.addView(foot);}
+ void render(){rows.removeAllViews();summary.setText(proxies.isEmpty()?"ВАШИ ПРОКСИ":"ПРОКСИ · "+proxies.size());if(proxies.isEmpty()){LinearLayout empty=new LinearLayout(this);empty.setOrientation(1);empty.setGravity(Gravity.CENTER);empty.setPadding(dp(24),dp(28),dp(24),dp(28));empty.setBackground(rounded(0xff454545,20));TextView symbol=text("◎",40,0xffff8a2b);empty.addView(symbol);TextView label=text("Здесь появятся прокси",18,0xfff6f0ea);label.setTypeface(null,1);empty.addView(label);space(empty,8);TextView hint=text("Получите список, проверьте пинг\nи выберите самый быстрый.",14,0xffdedede);hint.setGravity(Gravity.CENTER);empty.addView(hint);rows.addView(empty);return;}for(Proxy p:proxies){LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(16),dp(16),dp(16),dp(14));card.setBackground(rounded(0xff454545,20));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(10);rows.addView(card,lp);TextView host=text(p.host,16,0xfff6f0ea);host.setTypeface(null,1);host.setMaxLines(2);host.setEllipsize(android.text.TextUtils.TruncateAt.END);card.addView(host);space(card,6);LinearLayout meta=new LinearLayout(this);meta.setGravity(Gravity.CENTER_VERTICAL);meta.addView(text("MTProto · порт "+p.port,12,0xffdedede),new LinearLayout.LayoutParams(0,-2,1));TextView badge=text(p.ms==-2?"Не проверен":p.ms<0?"Не отвечает":p.ms+" мс",12,p.ms>=0?0xffff8a2b:p.ms==-1?0xffffb69c:0xffdedede);badge.setPadding(dp(10),dp(5),dp(10),dp(5));badge.setBackground(rounded(p.ms>=0?0xff454545:0xff282522,10));meta.addView(badge);card.addView(meta);space(card,12);Button connect=button("Подключить  ↗",false);connect.setOnClickListener(v->connect(p));card.addView(connect,new LinearLayout.LayoutParams(-1,dp(46)));}TextView foot=text("Пинг измеряет TCP-соединение, а не работу MTProto. Добавление прокси подтвердите в Telegram.\n\nИсточники выбираются кнопкой выше.",12,0xffdedede);foot.setPadding(dp(4),dp(6),dp(4),dp(20));rows.addView(foot);}
  Uri proxyUri(Proxy p){return new Uri.Builder().scheme("tg").authority("proxy").appendQueryParameter("server",p.host).appendQueryParameter("port",""+p.port).appendQueryParameter("secret",p.secret).build();} void connect(Proxy p){try{startActivity(new Intent(Intent.ACTION_VIEW,proxyUri(p)));}catch(ActivityNotFoundException e){new AlertDialog.Builder(this).setTitle("Telegram не найден").setMessage("Установите Telegram или приложение, которое поддерживает ссылки tg://proxy.").setPositiveButton("OK",null).show();}}
  @Override protected void onDestroy(){stopped=true;io.shutdownNow();if(probes!=null)probes.shutdownNow();super.onDestroy();}
 }
