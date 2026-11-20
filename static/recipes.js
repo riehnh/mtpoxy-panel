@@ -1,0 +1,15 @@
+'use strict';
+const $=id=>document.getElementById(id);let recipes=[],focusBefore;
+function el(tag,text,cls){const item=document.createElement(tag);if(text)item.textContent=text;if(cls)item.className=cls;return item;}
+function photo(row){const image=el('img');image.alt=row.name;image.loading='lazy';try{const url=new URL(row.image);if(url.protocol==='https:'&&url.hostname==='cdn.dummyjson.com')image.src=url.href;}catch(e){}return image;}
+function total(row){return (Number(row.prepTimeMinutes)||0)+(Number(row.cookTimeMinutes)||0);}
+function detail(row){
+ focusBefore=document.activeElement;const body=el('div',null,'detail-body');
+ body.append(el('p',row.cuisine,'category'),el('h2',row.name),el('p',total(row)+' минут · '+row.servings+' порций · '+row.difficulty));
+ body.append(el('h3','Ингредиенты'));const ingredients=el('ul');for(const value of row.ingredients||[])ingredients.append(el('li',value));body.append(ingredients,el('h3','Приготовление'));const steps=el('ol');for(const value of row.instructions||[])steps.append(el('li',value));body.append(steps);
+ $('detail').replaceChildren(photo(row),body);$('recipe').showModal();$('close').focus();
+}
+function render(){const query=$('search').value.toLocaleLowerCase().trim(),cuisine=$('cuisine').value;const selected=recipes.filter(row=>(!cuisine||row.cuisine===cuisine)&&(!$('quick').checked||total(row)<=30)&&(!query||[row.name,...(row.ingredients||[])].join(' ').toLocaleLowerCase().includes(query)));$('count').textContent=selected.length+' '+({one:'рецепт',few:'рецепта',many:'рецептов',other:'рецепта'}[new Intl.PluralRules('ru').select(selected.length)]);$('grid').replaceChildren();for(const row of selected){const button=el('button',null,'recipe');const body=el('div',null,'recipe-body');body.append(el('span',row.cuisine,'category'),el('h3',row.name));const meta=el('div',null,'meta');meta.append(el('span',total(row)+' мин'),el('span',row.servings+' порций'));body.append(meta);button.append(photo(row),body);button.onclick=()=>detail(row);$('grid').append(button);}if(!selected.length)$('grid').append(el('p','По вашему запросу ничего не найдено. Попробуйте другой ингредиент.','empty'));}
+for(const id of ['search','cuisine','quick'])$(id).addEventListener('input',render);
+$('close').onclick=()=>$('recipe').close();$('recipe').addEventListener('click',event=>{if(event.target===$('recipe')){const r=$('recipe').getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)$('recipe').close();}});$('recipe').addEventListener('close',()=>focusBefore?.focus());
+(async()=>{try{const response=await fetch('/api/recipes');if(!response.ok)throw new Error();const data=await response.json();recipes=data.recipes||[];for(const value of [...new Set(recipes.map(row=>row.cuisine))].sort()){$('cuisine').append(new Option(value,value));}if(recipes.length){const image=photo(recipes[0]);image.loading='eager';$('heroImage').append(image);}render();}catch(e){$('grid').replaceChildren(el('p','Каталог временно недоступен. Попробуйте обновить страницу позже.','empty'));}})();
