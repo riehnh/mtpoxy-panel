@@ -177,7 +177,75 @@ cd mtpoxy-panel
 sudo bash install.sh --source "$PWD"
 ```
 
-## Проверки
+## API статистики
+
+`GET /manage/api/stats` возвращает все прокси, а
+`GET /manage/api/stats/ID` — один конкретный прокси. Требуется сессия панели
+или отдельный ключ `Authorization: Bearer KEY` с правами **только чтения статистики**.
+Ключ не позволяет читать настройки, ссылки/секреты прокси или создавать прокси.
+Используйте адрес основной панели (IP:9443 или первый домен панели), HTTPS.
+
+Для выдачи ключа войдите через `POST /manage/api/login`, передав JSON
+`{"password":"ПАРОЛЬ_ПАНЕЛИ"}`. Сохраните cookie ответа и поле `csrf`.
+Затем выполните `POST /manage/api/statskey` с JSON `{}`, тем же cookie,
+заголовками `Origin: https://АДРЕС_ПАНЕЛИ` и `X-CSRF-Token: CSRF`.
+Ответ: `{"key":"...","scope":"stats:read","revoked":false}`.
+Ключ показывается только при выдаче, на сервере хранится его SHA-256.
+Повторная выдача сразу отзывает прежний ключ; JSON `{"revoke":true}` на том же
+endpoint отзывает ключ без создания нового. Для выдачи/отзыва Bearer недостаточно:
+нужны парольная сессия панели и CSRF.
+
+Пример получения ключа через Python 3 (пароль вводится без отображения):
+
+```python
+import getpass, http.cookiejar, json, urllib.request
+base = input('HTTPS-адрес панели без /manage: ').strip().rstrip('/')
+opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+def post(path, data, csrf=''):
+    req = urllib.request.Request(base + '/manage/api/' + path,
+        data=json.dumps(data).encode(), headers={'Content-Type': 'application/json',
+        'Origin': base, 'X-CSRF-Token': csrf})
+    with opener.open(req, timeout=20) as response:
+        return json.load(response)
+login = post('login', {'password': getpass.getpass('Пароль панели: ')})
+print(post('statskey', {}, login['csrf']))  # Сохраните ключ в надёжном месте.
+post('logout', {}, login['csrf'])
+```
+
+Пример запроса (подставьте свой ключ и ID):
+
+```bash
+curl -fsS -H 'Authorization: Bearer ВАШ_КЛЮЧ' \
+  https://ИМЯ.dynv6.net/manage/api/stats/1
+```
+
+Поля ответа:
+
+| Поле в `sites[]` | Значение |
+| --- | --- |
+| `id`, `hostname`, `status` | Прокси и состояние выпуска |
+| `available`, `sampled_at` | Доступны ли метрики; время замера Unix UTC |
+| `active_sessions` | Живые сессии WEB relay, приблизительная активность клиентов |
+| `active_connections` | Логические MTProto-соединения внутри сессий |
+| `sessions_created_total`, `connections_opened_total` | Сессии/соединения с запуска relay |
+| `bytes_up_total`, `bytes_down_total` | Байты к Telegram / от Telegram с запуска relay |
+| `unique_ips_24h` | `null`: сбор уникальных IP не реализован |
+
+Это не точное число людей или Telegram-аккаунтов. Считается полезная нагрузка
+relay, без HTTPS-накладных расходов и посещений сайта рецептов.
+Счётчики сбрасываются при перезапуске соответствующего relay
+(`counter_scope: relay_process_lifetime`, `resets_on_relay_restart: true`).
+Ответы кешируются на 5 секунд; `sampled_at` показывает фактическое время замера.
+Если relay недоступен или прокси ещё не выпущен, `available: false`, счётчики
+`null`, поле `error` объясняет причину. Один недоступный relay не обнуляет данные
+других. Неизвестный ID даёт 404, неправильный ключ — 401.
+История и уникальные IP не сохраняются. Для графиков опрашивайте API и храните
+замеры в своей системе мониторинга, учитывая сброс счётчиков.
+
+Уже установленную панель обновите повтором команды установки; APK менять
+для доступа к API не требуется. Локальные `/metrics` остаются на loopback.
+
+## Проверки кода
 
 ```bash
 python3 -m unittest discover -s tests -v

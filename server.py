@@ -23,6 +23,7 @@ import urllib.request
 
 from common import APP, ROOT, load_json, save_json
 import provision
+import proxy_stats
 
 SESSIONS = {}
 ATTEMPTS = defaultdict(list)
@@ -81,6 +82,16 @@ class Handler(BaseHTTPRequestHandler):
         expected = settings.get('panel_hostname', '')
         return hostname in ('localhost', '127.0.0.1', settings.get('public_ip')) or bool(expected and hostname == expected)
 
+    def stats_authorized(self):
+        authorization = self.headers.get('Authorization', '')
+        if authorization:
+            if not authorization.startswith('Bearer ') or len(authorization) > 256:
+                return False
+            expected = load_json(ROOT / 'settings.json', {}).get('stats_key_hash', '')
+            actual = hashlib.sha256(authorization[7:].encode()).hexdigest()
+            return bool(expected) and hmac.compare_digest(expected, actual)
+        return bool(self.session())
+
     def do_GET(self):
         path = urllib.parse.urlsplit(self.path).path
         # Keep the requested /mange spelling as an entry point; assets/API use /manage.
@@ -92,6 +103,18 @@ class Handler(BaseHTTPRequestHandler):
             if not self.allowed_panel_host():
                 return self.reply({'error': 'Not found'}, 404)
             session = self.session()
+            if path == '/manage/api/stats' or path.startswith('/manage/api/stats/'):
+                if not self.stats_authorized():
+                    return self.reply({'error': 'Нужен API-ключ статистики или вход в панель'}, 401)
+                records = provision.sites()
+                if path != '/manage/api/stats':
+                    identifier = path.removeprefix('/manage/api/stats/')
+                    if not re.fullmatch(r'[1-9][0-9]{0,18}', identifier):
+                        return self.reply({'error': 'Прокси не найден'}, 404)
+                    records = [row for row in records if row['id'] == int(identifier)]
+                    if not records:
+                        return self.reply({'error': 'Прокси не найден'}, 404)
+                return self.reply(proxy_stats.snapshot(records))
             if path == '/manage/download/android.apk':
                 apk = APP / 'downloads' / 'MTPoxy.apk'
                 if not apk.is_file():
@@ -156,6 +179,16 @@ class Handler(BaseHTTPRequestHandler):
                         if value is session:
                             del SESSIONS[key]
                 return self.reply({'ok': True}, cookie='mtpoxy_session=; Path=/manage; HttpOnly; SameSite=Strict; Max-Age=0')
+            if path == '/manage/api/statskey':
+                key = None if data.get('revoke') is True else secrets.token_urlsafe(32)
+                with provision.LOCK:
+                    settings = load_json(ROOT / 'settings.json')
+                    if key:
+                        settings['stats_key_hash'] = hashlib.sha256(key.encode()).hexdigest()
+                    else:
+                        settings.pop('stats_key_hash', None)
+                    save_json(ROOT / 'settings.json', settings)
+                return self.reply({'key': key, 'scope': 'stats:read', 'revoked': key is None})
             if path == '/manage/api/create':
                 retry = data.get('retry_id')
                 if retry is not None and type(retry) is not int:

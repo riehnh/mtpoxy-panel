@@ -12,6 +12,7 @@ os.environ['MTPOXY_STATE'] = temporary.name
 import common
 import provision
 import server
+import proxy_stats
 
 
 class PanelTest(unittest.TestCase):
@@ -32,9 +33,11 @@ class PanelTest(unittest.TestCase):
         cls.http.server_close()
         temporary.cleanup()
 
-    def call(self, path, data=None, cookie=None, csrf=None, origin=True):
+    def call(self, path, data=None, cookie=None, csrf=None, origin=True, bearer=None):
         connection = http.client.HTTPConnection('127.0.0.1', self.port)
         headers = {'Host': f'localhost:{self.port}'}
+        if bearer:
+            headers['Authorization'] = 'Bearer ' + bearer
         if origin:
             headers['Origin'] = f'http://localhost:{self.port}'
         if cookie:
@@ -75,6 +78,67 @@ class PanelTest(unittest.TestCase):
         self.assertEqual(body, (server.APP / 'downloads' / 'MTPoxy.apk').read_bytes())
         self.assertTrue(body.startswith(b'PK'))
         self.assertEqual(get('/manage/download/android.apk', 'unrelated.example')[0], 404)
+
+    def test_stats_key_is_read_only_rotatable_and_revocable(self):
+        self.assertEqual(self.call('stats')[0], 401)
+        self.assertEqual(self.call('statskey', {})[0], 401)
+        cookie, csrf = self.login()
+        self.assertEqual(self.call('statskey', {}, cookie=cookie)[0], 403)
+        status, _, issued = self.call('statskey', {}, cookie=cookie, csrf=csrf)
+        self.assertEqual(status, 200)
+        key = issued['key']
+        self.assertEqual(issued['scope'], 'stats:read')
+        self.assertNotIn(key, json.dumps(common.load_json(common.ROOT / 'settings.json')))
+        record = {'id': 123, 'hostname': 'recipe-stat.dynv6.net', 'status': 'active',
+                  'relay_port': 18002, 'secret': 'PRIVATE', 'link': 'PRIVATE-LINK'}
+        sample = {'schema_version': 1, 'sites': [{'id': 123, 'active_connections': 2}]}
+        with patch.object(provision, 'sites', return_value=[record]), patch.object(proxy_stats, 'snapshot', return_value=sample) as snapshot:
+            self.assertEqual(self.call('stats', bearer='wrong')[0], 401)
+            self.assertEqual(self.call('stats', bearer=key)[2], sample)
+            self.assertEqual(self.call('stats/123', bearer=key)[0], 200)
+            snapshot.assert_called_with([record])
+            self.assertEqual(self.call('stats/999', bearer=key)[0], 404)
+            self.assertEqual(self.call('stats/../state', bearer=key)[0], 404)
+            self.assertEqual(self.call('stats', cookie=cookie)[0], 200)
+        self.assertEqual(self.call('state', bearer=key)[0], 401)
+        self.assertEqual(self.call('create', {}, bearer=key)[0], 401)
+        new_key = self.call('statskey', {}, cookie=cookie, csrf=csrf)[2]['key']
+        self.assertNotEqual(key, new_key)
+        self.assertEqual(self.call('stats', bearer=key)[0], 401)
+        self.call('statskey', {'revoke': True}, cookie=cookie, csrf=csrf)
+        self.assertEqual(self.call('stats', bearer=new_key)[0], 401)
+
+    def test_stats_metrics_are_real_cached_and_do_not_expose_secrets(self):
+        metrics = '\n'.join(f'{name} {i + 1}' for i, name in enumerate(proxy_stats.FIELDS.values()))
+        self.assertEqual(proxy_stats.parse_metrics(metrics)['bytes_down_total'], 6)
+        with self.assertRaises(ValueError):
+            proxy_stats.parse_metrics('tproxy_sessions_live 0')
+        row = {'id': 765, 'hostname': 'recipe-stats.dynv6.net', 'status': 'active',
+               'relay_port': 18002, 'secret': 'DO-NOT-EXPOSE', 'link': 'PRIVATE-LINK'}
+        class Response:
+            def __enter__(self): return self
+            def __exit__(self, *_): pass
+            def read(self, _): return metrics.encode()
+        with patch.object(proxy_stats.urllib.request.OpenerDirector, 'open', return_value=Response()) as request:
+            proxy_stats.CACHE.clear()
+            sample = proxy_stats.snapshot([row])
+            proxy_stats.snapshot([row])
+            self.assertEqual(request.call_count, 1)
+            request.assert_called_with('http://127.0.0.1:18003/metrics', timeout=2)
+        result = sample['sites'][0]
+        self.assertTrue(result['available'])
+        self.assertEqual(result['active_sessions'], 1)
+        self.assertEqual(result['active_connections'], 2)
+        self.assertIsNone(result['unique_ips_24h'])
+        self.assertNotIn('DO-NOT-EXPOSE', json.dumps(sample))
+        self.assertNotIn('PRIVATE-LINK', json.dumps(sample))
+        self.assertTrue(sample['resets_on_relay_restart'])
+        with patch.object(proxy_stats.urllib.request.OpenerDirector, 'open', side_effect=OSError()):
+            failure = proxy_stats.read_site(row)
+        self.assertFalse(failure['available'])
+        self.assertIsNone(failure['active_connections'])
+        self.assertEqual(failure['error'], 'relay_metrics_unavailable')
+        self.assertEqual(proxy_stats.read_site(dict(row, status='error'))['error'], 'proxy_not_active')
 
     def test_authentication_and_write_only_token(self):
         self.assertEqual(self.call('state')[0], 401)
