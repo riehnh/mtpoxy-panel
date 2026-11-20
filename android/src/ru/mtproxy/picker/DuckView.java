@@ -33,6 +33,7 @@ public final class DuckView extends View {
         if (android.animation.ValueAnimator.areAnimatorsEnabled()) {
             canvas.rotate((SystemClock.uptimeMillis() % 5000) * 360f / 5000f);
         }
+        canvas.rotate(180);
         canvas.scale(scale, scale);
         canvas.translate(-100, -100);
 
@@ -51,19 +52,16 @@ public final class DuckView extends View {
         canvas.drawCircle(127, 65, 35, paint);
         paint.setShader(null);
 
-        paint.setColor(0xffe96b24);
-        shape.reset();
-        shape.moveTo(153, 65);
-        shape.quadTo(173, 65, 187, 76);
-        shape.quadTo(173, 88, 151, 84);
-        shape.close();
-        canvas.drawPath(shape, paint);
         paint.setColor(0xffffe4a0);
         canvas.drawOval(57, 108, 121, 145, paint);
         paint.setColor(0xff271a13);
         canvas.drawCircle(139, 57, 4.5f, paint);
         paint.setColor(Color.WHITE);
         canvas.drawCircle(140.3f, 55.5f, 1.4f, paint);
+        paint.setColor(0xff28a8ea);
+        shape.reset(); shape.moveTo(150,66); shape.lineTo(194,43); shape.lineTo(181,91); shape.lineTo(169,78); shape.lineTo(159,85); shape.lineTo(160,72); shape.close();canvas.drawPath(shape,paint);
+        paint.setColor(Color.WHITE);
+        shape.reset();shape.moveTo(160,72);shape.lineTo(184,52);shape.lineTo(169,78);shape.lineTo(168,84);shape.lineTo(167,74);shape.close();canvas.drawPath(shape,paint);
         canvas.restore();
 
         if (isShown() && getWindowVisibility() == VISIBLE && hasWindowFocus()

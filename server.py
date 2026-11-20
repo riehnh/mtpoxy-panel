@@ -119,7 +119,7 @@ class Handler(BaseHTTPRequestHandler):
                 apk = APP / 'downloads' / 'MTPoxy.apk'
                 if not apk.is_file():
                     return self.reply({'error': 'APK отсутствует. Обновите установку из GitHub.'}, 404)
-                return self.reply(apk.read_bytes(), content_type='application/vnd.android.package-archive', download='MTPoxy.apk')
+                return self.reply(apk.read_bytes(), content_type='application/vnd.android.package-archive', download='Yoxy.apk')
             if path == '/manage/api/session':
                 return self.reply({'authenticated': bool(session), 'csrf': session['csrf'] if session else None})
             if path == '/manage/api/state':
@@ -131,7 +131,7 @@ class Handler(BaseHTTPRequestHandler):
                                    'token_configured': bool(settings.get('dynv6_token'))})
             if path in ('/manage', '/manage/'):
                 return self.asset('panel.html')
-            if path in ('/manage/panel.js', '/manage/panel.css'):
+            if path in ('/manage/panel.js', '/manage/panel.css', '/manage/logo.svg'):
                 return self.asset(path.rsplit('/', 1)[1])
             return self.reply({'error': 'Not found'}, 404)
         hostname = self.headers.get('Host', '').split(':')[0].lower()
@@ -141,7 +141,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(load_json(ROOT / 'recipes.json', {'recipes': []}))
         if path == '/':
             return self.asset('recipes.html')
-        if path in ('/recipes.js', '/recipes.css'):
+        if path in ('/recipes.js', '/recipes.css', '/logo.svg'):
             return self.asset(path[1:])
         return self.reply(b'Page not found', 404, 'text/plain')
 

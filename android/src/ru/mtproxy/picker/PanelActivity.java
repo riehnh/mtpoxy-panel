@@ -35,7 +35,8 @@ public class PanelActivity extends Activity {
         page=new LinearLayout(this);page.setOrientation(1);page.setPadding(dp(24),dp(28),dp(24),dp(32));
         page.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(dp(24),dp(20)+i.getSystemWindowInsetTop(),dp(24),dp(20)+i.getSystemWindowInsetBottom());return i;});
         scroll.addView(page);setContentView(scroll);scroll.requestApplyInsets();
-        TextView title=text(heading,30);title.setTextColor(Color.rgb(255,147,45));page.addView(title);status=text("",14);page.addView(status);
+        ImageView logo=new ImageView(this);logo.setImageResource(getResources().getIdentifier("ic_launcher","drawable",getPackageName()));page.addView(logo,new LinearLayout.LayoutParams(dp(52),dp(52)));
+        TextView title=text("Ёкси · "+heading,30);title.setTextColor(Color.rgb(255,147,45));page.addView(title);status=text("",14);page.addView(status);
     }
     EditText field(String hint,String value,boolean secret){
         EditText v=new EditText(this);v.setTextColor(Color.WHITE);v.setHintTextColor(Color.LTGRAY);v.setHint(hint);v.setText(value);v.setSingleLine(true);

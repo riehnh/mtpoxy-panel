@@ -125,7 +125,7 @@ final class PanelClient {
             connection.setConnectTimeout(12000);
             connection.setReadTimeout(15000);
             connection.setRequestProperty("Accept", "application/json");
-            connection.setRequestProperty("User-Agent", "MTPoxy-Android/1.5");
+            connection.setRequestProperty("User-Agent", "Yoxy-Android/1.6");
             connection.setRequestProperty("Origin", origin);
             if (!session.isEmpty()) connection.setRequestProperty("Cookie", session);
             if (payload != null) {
