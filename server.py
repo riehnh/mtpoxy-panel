@@ -45,15 +45,17 @@ class Handler(BaseHTTPRequestHandler):
         # URL query strings and request bodies may contain credentials.
         pass
 
-    def reply(self, body, status=200, content_type='application/json; charset=utf-8', cookie=None):
+    def reply(self, body, status=200, content_type='application/json; charset=utf-8', cookie=None, download=None):
         if not isinstance(body, bytes):
             body = json.dumps(body, ensure_ascii=False).encode()
         self.send_response(status)
         self.send_header('Content-Type', content_type)
         self.send_header('Content-Length', str(len(body)))
+        if download:
+            self.send_header('Content-Disposition', f'attachment; filename="{download}"')
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Referrer-Policy', 'same-origin')
-        self.send_header('Cache-Control', 'no-store' if self.path.startswith('/manage') else 'public, max-age=120')
+        self.send_header('Cache-Control', 'no-store' if self.path.startswith(('/manage', '/mange')) else 'public, max-age=120')
         self.send_header('Content-Security-Policy', "default-src 'self'; img-src 'self' https://cdn.dummyjson.com; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
         if cookie:
             self.send_header('Set-Cookie', cookie)
@@ -81,12 +83,20 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urllib.parse.urlsplit(self.path).path
+        # Keep the requested /mange spelling as an entry point; assets/API use /manage.
+        if path in ('/mange', '/mange/'):
+            path = '/manage'
         if path == '/' and self.allowed_panel_host() and self.headers.get('Host', '').split(':')[0] == load_json(ROOT / 'settings.json').get('public_ip'):
             return self.asset('panel.html')
         if path.startswith('/manage'):
             if not self.allowed_panel_host():
                 return self.reply({'error': 'Not found'}, 404)
             session = self.session()
+            if path == '/manage/download/android.apk':
+                apk = APP / 'downloads' / 'MTPoxy.apk'
+                if not apk.is_file():
+                    return self.reply({'error': 'APK отсутствует. Обновите установку из GitHub.'}, 404)
+                return self.reply(apk.read_bytes(), content_type='application/vnd.android.package-archive', download='MTPoxy.apk')
             if path == '/manage/api/session':
                 return self.reply({'authenticated': bool(session), 'csrf': session['csrf'] if session else None})
             if path == '/manage/api/state':

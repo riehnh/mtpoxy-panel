@@ -11,3 +11,6 @@ recipes.json
 *.log
 initial-password
 dist/
+android/build/
+*.jks
+*.keystore

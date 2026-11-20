@@ -55,6 +55,27 @@ class PanelTest(unittest.TestCase):
         self.assertEqual(status, 200)
         return headers['Set-Cookie'].split(';')[0], body['csrf']
 
+    def test_android_download_and_mange_alias(self):
+        def get(path, host='localhost'):
+            connection = http.client.HTTPConnection('127.0.0.1', self.port)
+            connection.request('GET', path, headers={'Host': host})
+            response = connection.getresponse()
+            result = response.status, dict(response.getheaders()), response.read()
+            connection.close()
+            return result
+        status, headers, body = get('/mange')
+        self.assertEqual(status, 200)
+        self.assertIn(b'/manage/download/android.apk', body)
+        self.assertEqual(headers['Cache-Control'], 'no-store')
+        self.assertEqual(get('/mange', 'unrelated.example')[0], 404)
+        status, headers, body = get('/manage/download/android.apk')
+        self.assertEqual(status, 200)
+        self.assertEqual(headers['Content-Type'], 'application/vnd.android.package-archive')
+        self.assertIn('attachment;', headers['Content-Disposition'])
+        self.assertEqual(body, (server.APP / 'downloads' / 'MTPoxy.apk').read_bytes())
+        self.assertTrue(body.startswith(b'PK'))
+        self.assertEqual(get('/manage/download/android.apk', 'unrelated.example')[0], 404)
+
     def test_authentication_and_write_only_token(self):
         self.assertEqual(self.call('state')[0], 401)
         self.assertEqual(self.call('login', {'password': 'wrong'})[0], 401)

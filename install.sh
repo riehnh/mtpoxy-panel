@@ -50,6 +50,9 @@ install -d -m 0700 /var/lib/mtpoxy /etc/mtpoxy
 if [[ $(readlink -f "$source_directory") != /opt/mtpoxy ]]; then
     cp "$source_directory/"*.py /opt/mtpoxy/
     cp -r "$source_directory/static" /opt/mtpoxy/
+    if [[ -d "$source_directory/downloads" ]]; then
+        cp -r "$source_directory/downloads" /opt/mtpoxy/
+    fi
 fi
 python3 -m compileall -q /opt/mtpoxy
 
