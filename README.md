@@ -7,7 +7,6 @@ Python-панель, которая создаёт Telegram **WEB-proxy** вме
 
 ## Установка одной командой
 
-После публикации репозитория `riehnh/mtpoxy-panel` выполните команду ниже.
 Выполните от root на VPS:
 
 ```bash
@@ -123,18 +122,21 @@ systemctl disable --now mtpoxy-routing.service mtpoxy-router.service
 Для резервной копии сохраните `/var/lib/mtpoxy`, `/etc/mtpoxy`,
 `/etc/mtproxy` и папку сертификатов `/var/lib/mtpoxy/caddy`.
 
-## Публикация в GitHub
+## Исходники
 
-Создайте пустой публичный репозиторий `mtpoxy-panel` и выполните из проекта:
+Репозиторий проекта — https://github.com/riehnh/mtpoxy-panel.
+Чтобы скачать исходники:
 
 ```bash
-git remote add origin https://github.com/riehnh/mtpoxy-panel.git
-git push -u origin main
+git clone https://github.com/riehnh/mtpoxy-panel.git
+cd mtpoxy-panel
 ```
 
-После загрузки файлов команда установки из первого раздела станет доступна.
-Для скачанного ZIP сначала выполните `git init -b main`, `git add .`,
-`git commit -m "Initial MTPoxy Panel"`, затем команды выше.
+Установка из скачанной папки на VPS:
+
+```bash
+sudo bash install.sh --source "$PWD"
+```
 
 ## Проверки
 
