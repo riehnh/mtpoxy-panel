@@ -16,7 +16,7 @@ public class PanelActivity extends Activity {
     final Handler handler=new Handler();
     final ExecutorService worker=Executors.newSingleThreadExecutor();
     ConnectionVault vault; PanelClient client;
-    LinearLayout page, sites; TextView status;
+    LinearLayout page, sites, settingsPanel; TextView status;
     EditText address,password,email,token; Button create;
     boolean running,active,resumed; String savedAddress="",savedPassword="",lastSites="";
     final Runnable poll=()->refresh();
@@ -36,12 +36,14 @@ public class PanelActivity extends Activity {
         page.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(dp(24),dp(20)+i.getSystemWindowInsetTop(),dp(24),dp(20)+i.getSystemWindowInsetBottom());return i;});
         scroll.addView(page);setContentView(scroll);scroll.requestApplyInsets();
         ImageView logo=new ImageView(this);logo.setImageResource(getResources().getIdentifier("ic_launcher","drawable",getPackageName()));page.addView(logo,new LinearLayout.LayoutParams(dp(52),dp(52)));
-        TextView title=text("Ёкси · "+heading,30);title.setTextColor(Color.rgb(255,147,45));page.addView(title);status=text("",14);page.addView(status);
+        TextView title=text(heading,26);title.setTextColor(0xfff4f4f5);page.addView(title);status=text("",14);page.addView(status);
     }
     EditText field(String hint,String value,boolean secret){
+        page.addView(text(hint,13));
         EditText v=new EditText(this);v.setTextColor(Color.WHITE);v.setHintTextColor(Color.LTGRAY);v.setHint(hint);v.setText(value);v.setSingleLine(true);
         v.setInputType(secret?InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD:InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_URI);
-        page.addView(v,new LinearLayout.LayoutParams(-1,dp(58)));return v;
+        GradientDrawable inputBg=new GradientDrawable();inputBg.setColor(0xff131517);inputBg.setStroke(dp(1),0xff454951);inputBg.setCornerRadius(dp(12));v.setBackground(inputBg);v.setPadding(dp(14),0,dp(14),0);v.setTextSize(16);
+        page.addView(v,new LinearLayout.LayoutParams(-1,dp(54)));return v;
     }
     Button button(String title,Runnable action){
         Button v=new Button(this);v.setText(title);v.setAllCaps(false);v.setTextColor(Color.BLACK);v.setTextSize(17);
@@ -49,10 +51,10 @@ public class PanelActivity extends Activity {
         LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,dp(54));params.topMargin=dp(12);page.addView(v,params);v.setOnClickListener(w->action.run());return v;
     }
     void form(){
-        active=false;handler.removeCallbacks(poll);base("Жупень · мой VPS");page.addView(text("Адрес и пароль панели из установщика",16));
+        active=false;handler.removeCallbacks(poll);base("Подключить VPS");page.addView(text("Адрес и пароль панели из установщика",16));
         address=field("IP VPS или https://домен/manage",savedAddress,false);password=field("Пароль панели (не пароль SSH)",savedPassword,true);
         button("Открыть панель",()->connect(address.getText().toString(),password.getText().toString()));
-        button("чё?",()->new AlertDialog.Builder(this).setTitle("Как завести свою Жупень")
+        button("чё?",()->new AlertDialog.Builder(this).setTitle("Как подключить VPS")
             .setMessage("1. Арендуйте VPS с публичным IPv4: Ubuntu 22.04+ или Debian 12+ (amd64).\n\n2. Подключитесь по SSH и выполните команду из README проекта. Установщик выдаст HTTPS-адрес и пароль панели.\n\n3. Зарегистрируйтесь на dynv6.com и создайте HTTP Token.\n\n4. Введите здесь адрес и пароль панели. В панели сохраните HTTP Token dynv6 и вашу почту для HTTPS.\n\n5. Нажмите «Создать WEB-proxy», дождитесь выпуска и подключитесь в Telegram. Для нового прокси нажмите снова.\n\nПри первом входе по IP сравните отпечаток сертификата с выданным установщиком.")
             .setPositiveButton("Проект и установка",(d,w)->open("https://github.com/riehnh/mtpoxy-panel#readme"))
             .setNeutralButton("dynv6",(d,w)->open("https://dynv6.com/")) .setNegativeButton("Понятно",null).show());
@@ -79,15 +81,23 @@ public class PanelActivity extends Activity {
         });}});
     }
     void dashboard(JSONObject data)throws Exception{
-        active=true;lastSites="";base("Жупень · панель");page.addView(text(client.origin,14));JSONObject settings=data.getJSONObject("settings");
+        active=true;lastSites="";base("Мои прокси");page.addView(text(client.origin,14));JSONObject settings=data.getJSONObject("settings");
+        final LinearLayout dashboard=page;
+        settingsPanel=new LinearLayout(this);settingsPanel.setOrientation(1);settingsPanel.setPadding(dp(16),dp(8),dp(16),dp(16));
+        GradientDrawable settingsBg=new GradientDrawable();settingsBg.setColor(0xff1a1c1f);settingsBg.setCornerRadius(dp(18));settingsPanel.setBackground(settingsBg);
+        Button settingsToggle=button("Настройки подключения",()->{if(!running)settingsPanel.setVisibility(settingsPanel.getVisibility()==android.view.View.VISIBLE?android.view.View.GONE:android.view.View.VISIBLE);});
+        settingsToggle.setTextColor(0xfff4f4f5);settingsToggle.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff25282d));
+        page.addView(settingsPanel);page=settingsPanel;
         email=field("Почта для HTTPS",settings.optString("email"),false);email.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);token=field("HTTP Token dynv6","",true);
         button("Сохранить API и почту",()->{
             final String mail=email.getText().toString().trim(),key=token.getText().toString().trim();
             request(()->client.call("settings",new JSONObject().put("email",mail).put("token",key)),r->{token.setText("");refresh();});
         });
+        page=dashboard;settingsPanel.setVisibility(data.optBoolean("token_configured")&&!settings.optString("email").isEmpty()?android.view.View.GONE:android.view.View.VISIBLE);
         create=button("Создать WEB-proxy",()->request(()->client.call("create",new JSONObject().put("slug","")),r->refresh()));
         sites=new LinearLayout(this);sites.setOrientation(1);page.addView(sites);
-        button("Полная веб-панель",()->open(client.origin+"/manage"));button("Изменить VPS",()->{if(!running)form();});render(data);
+        Button web=button("Открыть в браузере ↗",()->open(client.origin+"/manage"));web.setTextColor(0xffa6abb3);web.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff25282d));
+        Button change=button("Изменить VPS",()->{if(!running)form();});change.setTextColor(0xffa6abb3);change.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff25282d));render(data);
     }
     void refresh(){handler.removeCallbacks(poll);if(!active)return;if(running){schedule(1500);return;}request(()->client.call("state",null),r->render(r));}
     void schedule(int delay){handler.removeCallbacks(poll);if(active&&resumed)handler.postDelayed(poll,delay);}
@@ -96,9 +106,9 @@ public class PanelActivity extends Activity {
         create.setEnabled(!busy&&configured&&!data.getJSONObject("settings").optString("email").isEmpty());create.setText(busy?"Создаётся…":"Создать WEB-proxy");
         JSONArray rows=data.getJSONArray("sites");String snapshot=rows.toString();
         if(!snapshot.equals(lastSites)){lastSites=snapshot;sites.removeAllViews();if(rows.length()==0)sites.addView(text("Здесь появятся ваши прокси",16));
-            for(int i=rows.length()-1;i>=0;i--){JSONObject row=rows.getJSONObject(i);String state=row.optString("status");sites.addView(text(row.optString("hostname"),20));
-                sites.addView(text(row.optString("warning").isEmpty()?row.optString("message"):row.optString("warning"),14));Button action=new Button(this);action.setAllCaps(false);sites.addView(action);
-                if(state.equals("active")){action.setText("Пихаем в Telegram");action.setOnClickListener(v->{Uri link=Uri.parse(row.optString("link"));open("tg://webproxy?"+link.getEncodedQuery());});}
+            for(int i=rows.length()-1;i>=0;i--){JSONObject row=rows.getJSONObject(i);String state=row.optString("status");LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(16),dp(12),dp(16),dp(16));GradientDrawable bg=new GradientDrawable();bg.setColor(0xff1a1c1f);bg.setCornerRadius(dp(16));card.setBackground(bg);LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.topMargin=dp(12);sites.addView(card,cp);card.addView(text(row.optString("hostname"),18));
+                card.addView(text(row.optString("warning").isEmpty()?row.optString("message"):row.optString("warning"),14));Button action=new Button(this);action.setAllCaps(false);card.addView(action);
+                if(state.equals("active")){action.setText("Подключить в Telegram");action.setOnClickListener(v->{Uri link=Uri.parse(row.optString("link"));open("tg://webproxy?"+link.getEncodedQuery());});}
                 else if(state.equals("error")){action.setText("Повторить");action.setOnClickListener(v->request(()->client.call("create",new JSONObject().put("retry_id",row.getInt("id"))),r->refresh()));}
                 else{action.setText("Создаётся…");action.setEnabled(false);}
             }

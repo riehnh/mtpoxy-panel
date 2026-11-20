@@ -116,6 +116,8 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply({'error': 'Прокси не найден'}, 404)
                 return self.reply(proxy_stats.snapshot(records))
             if path == '/manage/download/android.apk':
+                if not session:
+                    return self.reply({'error': 'Войдите в панель'}, 401)
                 apk = APP / 'downloads' / 'MTPoxy.apk'
                 if not apk.is_file():
                     return self.reply({'error': 'APK отсутствует. Обновите установку из GitHub.'}, 404)

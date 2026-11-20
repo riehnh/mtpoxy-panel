@@ -23,7 +23,7 @@ function renderSites(sites) {
     if(site.status!=='active'||site.warning)card.append(node('p',site.warning||site.message,'site-message'));
     const actions=node('div',null,'actions');
     if(site.status==='active') {
-      const open=node('a','Открыть в Telegram','button primary'); const link=new URL(site.link); open.href='tg://webproxy?'+link.searchParams.toString();
+      const open=node('a','Подключить в Telegram','button primary'); const link=new URL(site.link); open.href='tg://webproxy?'+link.searchParams.toString();
       const copy=node('button','Скопировать ссылку'); copy.onclick=async()=>{try{await navigator.clipboard.writeText(site.link);notice('Ссылка скопирована');}catch(e){notice('Буфер обмена недоступен. Откройте ссылку в Telegram.');}};
       const website=node('a','Сайт рецептов','button');website.href=site.site_url;website.target='_blank';website.rel='noopener';
       actions.append(open,copy,website);
@@ -47,8 +47,9 @@ async function state() {
   $('token').placeholder=data.token_configured?'Оставьте пустым, чтобы сохранить':'Вставьте HTTP token';
   $('serverIp').textContent='IP сервера · '+data.settings.public_ip;
   $('working').hidden=!data.busy;
+  $('setupHint').hidden=!!(data.token_configured&&data.settings.email);
   $('createButton').disabled=data.busy||!data.token_configured||!data.settings.email;
-  $('createButton').textContent=data.busy?'Создаём…':'Создать WEB-proxy';
+  $('createButton').textContent=data.busy?'Создаём…':'Создать прокси';
   $('settingsForm').querySelector('button').disabled=data.busy;
   renderSites(data.sites);
 }
@@ -69,3 +70,13 @@ $('settingsForm').onsubmit=async event=>{
 $('createForm').onsubmit=async event=>{event.preventDefault();$('createButton').disabled=true;try{await api('create',{slug:$('slug').value});$('slug').value='';await state();}catch(e){notice(e.message);$('createButton').disabled=false;}};
 $('logout').onclick=async()=>{try{await api('logout',{});}finally{showLogin();}};
 (async()=>{try{const session=await api('session');csrf=session.csrf||'';if(session.authenticated)await showWorkspace();else showLogin();}catch(e){showLogin();notice('Панель временно недоступна. Обновите страницу.');}})();
+
+function selectPage(name) {
+  document.querySelectorAll('[data-page]').forEach(page=>page.hidden=page.dataset.page!==name);
+  document.querySelectorAll('[data-tab]').forEach(button=>{
+    if(button.dataset.tab===name)button.setAttribute('aria-current','page');
+    else button.removeAttribute('aria-current');
+  });
+}
+document.querySelectorAll('[data-tab]').forEach(button=>button.onclick=()=>selectPage(button.dataset.tab));
+$('openSettings').onclick=()=>selectPage('settings');

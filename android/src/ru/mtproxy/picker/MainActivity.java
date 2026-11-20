@@ -40,7 +40,7 @@ public class MainActivity extends Activity {
   LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setPadding(dp(20),dp(16),dp(20),0);root.setBackgroundColor(0xff101010);
   root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(dp(20),i.getSystemWindowInsetTop()+dp(16),dp(20),i.getSystemWindowInsetBottom());return i;});
   LinearLayout brand=new LinearLayout(this);brand.setGravity(Gravity.CENTER_VERTICAL);ImageView logo=new ImageView(this);logo.setImageResource(getResources().getIdentifier("ic_launcher","drawable",getPackageName()));brand.addView(logo,new LinearLayout.LayoutParams(dp(48),dp(48)));LinearLayout title=new LinearLayout(this);title.setOrientation(1);title.setPadding(dp(12),0,0,0);TextView name=text("Ёкси",24,0xfff6f0ea);name.setTypeface(null,1);title.addView(name);title.addView(text("Это вам не это",13,0xffb2aaa4));brand.addView(title);root.addView(brand);space(root,20);
-  LinearLayout hero=new LinearLayout(this);hero.setOrientation(1);hero.setPadding(dp(20),dp(18),dp(20),dp(18));hero.setBackground(rounded(0xff302218,24));TextView heading=text("Тыкни.\nПотыкай ещё раз.",27,0xffffa45e);heading.setTypeface(null,1);hero.addView(heading);space(hero,8);hero.addView(text("Найди лучший вариант тыкания\nи тыкни в тыкалку",14,0xffd6c0b0));space(hero,16);load=button("↓  Получить список",true);hero.addView(load,new LinearLayout.LayoutParams(-1,dp(50)));root.addView(hero);space(root,14);
+  LinearLayout hero=new LinearLayout(this);hero.setOrientation(1);hero.setPadding(dp(20),dp(18),dp(20),dp(18));hero.setBackground(rounded(0xff302218,24));TextView heading=text("Выберите прокси",27,0xffffa45e);heading.setTypeface(null,1);hero.addView(heading);space(hero,8);hero.addView(text("Загрузите список и проверьте скорость соединения",14,0xffd6c0b0));space(hero,16);load=button("↓  Получить список",true);hero.addView(load,new LinearLayout.LayoutParams(-1,dp(50)));root.addView(hero);space(root,14);
   for(int i=0;i<selected.length;i++)selected[i]=getPreferences(0).getBoolean("source_"+i,i==0); sources=button("Источники · "+sourceLabel()+"  ▾",false);sources.setOnClickListener(v->chooseSources(sources));root.addView(sources,new LinearLayout.LayoutParams(-1,-2));space(root,10);
   LinearLayout actions=new LinearLayout(this);ping=button("◉  Проверить пинг",false);sort=button("По пингу ↑",false);LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(0,dp(48),1);ap.setMarginEnd(dp(8));actions.addView(ping,ap);actions.addView(sort,new LinearLayout.LayoutParams(0,dp(48),1));root.addView(actions);space(root,12);
   progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);root.addView(progress);progress.setVisibility(View.GONE);
@@ -66,11 +66,9 @@ public class MainActivity extends Activity {
   scroll.addView(page);
   setContentView(scroll);
   scroll.requestApplyInsets();
-  TextView name=text("Ёкси",30,0xffff8a2b);
-  name.setTypeface(null,1);
-  ImageView mark=new ImageView(this);mark.setImageResource(getResources().getIdentifier("ic_launcher","drawable",getPackageName()));page.addView(mark,new LinearLayout.LayoutParams(dp(52),dp(52)));
-  page.addView(name);
-  page.addView(text("Это вам не это",14,0xffb2aaa4));
+  LinearLayout brand=new LinearLayout(this);brand.setGravity(Gravity.CENTER_VERTICAL);
+  ImageView mark=new ImageView(this);mark.setImageResource(getResources().getIdentifier("ic_launcher","drawable",getPackageName()));brand.addView(mark,new LinearLayout.LayoutParams(dp(44),dp(44)));
+  TextView name=text("Ёкси",23,0xfff4f4f5);name.setTypeface(null,1);name.setPadding(dp(12),0,0,0);brand.addView(name);page.addView(brand);
   space(page,24);
   return page;
  }
@@ -79,25 +77,30 @@ public class MainActivity extends Activity {
   LinearLayout page=modePage();
   Button sourcePicker=button("Источники · "+sourceLabel()+"  ▾",false);
   sourcePicker.setOnClickListener(v->chooseSources(sourcePicker));
-  page.addView(sourcePicker);
+  page.addView(sourcePicker);space(page,16);
   LinearLayout center=new LinearLayout(this);
   center.setOrientation(1);
   center.setGravity(Gravity.CENTER);
-  center.setPadding(0,dp(20),0,dp(20));
+  center.setPadding(0,dp(12),0,dp(12));
+  center.setBackground(rounded(0xff1a1c1f,24));
   page.addView(center,new LinearLayout.LayoutParams(-1,0,1));
   DuckView duck=new DuckView(this);
   duck.setContentDescription("Жупень. Панель моего VPS");
   duck.setOnClickListener(v->openPanel());
-  center.addView(duck,new LinearLayout.LayoutParams(dp(184),dp(184)));
+  center.addView(duck,new LinearLayout.LayoutParams(dp(144),dp(144)));
   TextView duckName=text("Жупень",27,0xffff8a2b);
   duckName.setTypeface(null,1);
   duckName.setGravity(Gravity.CENTER);
   duckName.setPadding(0,dp(10),0,dp(10));
   duckName.setOnClickListener(v->openPanel());
   center.addView(duckName);
+  center.addView(text("Управление своим VPS",14,0xffa6abb3));
+  space(page,18);
+  page.addView(text("БЕСПЛАТНЫЕ ПРОКСИ",12,0xffa6abb3));space(page,8);
   Button free=button("Халява",false);
   free.setOnClickListener(v->showAutomatic());
   page.addView(free);
+  space(page,4);page.addView(text("Автоматически найти самый быстрый",13,0xffa6abb3));
   space(page,8);
   Button manual=button("Манул",false);
   manual.setOnClickListener(v->{
@@ -111,6 +114,7 @@ public class MainActivity extends Activity {
    manualScreen.requestApplyInsets();
   });
   page.addView(manual);
+  space(page,4);page.addView(text("Открыть список и выбрать вручную",13,0xffa6abb3));
  }
  void openPanel(){
   startActivity(new Intent(this,PanelActivity.class));

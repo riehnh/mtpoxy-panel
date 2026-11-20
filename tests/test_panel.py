@@ -59,9 +59,12 @@ class PanelTest(unittest.TestCase):
         return headers['Set-Cookie'].split(';')[0], body['csrf']
 
     def test_android_download_and_mange_alias(self):
-        def get(path, host='localhost'):
+        def get(path, host='localhost', cookie=None):
             connection = http.client.HTTPConnection('127.0.0.1', self.port)
-            connection.request('GET', path, headers={'Host': host})
+            headers = {'Host': host}
+            if cookie:
+                headers['Cookie'] = cookie
+            connection.request('GET', path, headers=headers)
             response = connection.getresponse()
             result = response.status, dict(response.getheaders()), response.read()
             connection.close()
@@ -71,7 +74,9 @@ class PanelTest(unittest.TestCase):
         self.assertIn(b'/manage/download/android.apk', body)
         self.assertEqual(headers['Cache-Control'], 'no-store')
         self.assertEqual(get('/mange', 'unrelated.example')[0], 404)
-        status, headers, body = get('/manage/download/android.apk')
+        self.assertEqual(get('/manage/download/android.apk')[0], 401)
+        cookie, _ = self.login()
+        status, headers, body = get('/manage/download/android.apk', cookie=cookie)
         self.assertEqual(status, 200)
         self.assertEqual(headers['Content-Type'], 'application/vnd.android.package-archive')
         self.assertIn('attachment;', headers['Content-Disposition'])
