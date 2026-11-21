@@ -32,6 +32,7 @@ public class MainActivity extends Activity {
  AlertDialog aboutDialog;TextView aboutUpdateStatus;Button aboutCheckButton;
  LinearLayout freeRows;Button refreshFree,checkFree,bestFree;int visibleFree=60;
  final ArrayList<Proxy> candidates=new ArrayList<>();
+ final IdentityHashMap<Proxy,Long> candidatePings=new IdentityHashMap<>();
  final ArrayList<Proxy> proxies=new ArrayList<>();
  final ExecutorService io=Executors.newSingleThreadExecutor();
  ExecutorService probes; boolean busy=false, ascending=true; volatile boolean stopped=false;
@@ -88,7 +89,7 @@ public class MainActivity extends Activity {
   space(page,20);LinearLayout links=new LinearLayout(this);Button help=button("Хелпинг",false),about=button("Факинг",false);help.setOnClickListener(v->showHelp());about.setOnClickListener(v->showAbout());LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(0,dp(50),1);hp.rightMargin=dp(8);links.addView(help,hp);links.addView(about,new LinearLayout.LayoutParams(0,dp(50),1));page.addView(links);offerUpdate();
 
  }
- LinearLayout tile(String title,String detail,String symbol,int color,Runnable action){LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);tile.setPadding(dp(16),dp(14),dp(16),dp(16));tile.setBackgroundColor(color);if(title.equals("Жупень")){ImageView logo=new ImageView(this);logo.setImageResource(getResources().getIdentifier("ic_launcher","drawable",getPackageName()));tile.addView(logo,new LinearLayout.LayoutParams(dp(48),dp(54)));}else{TextView icon=text(symbol,25,0xff343434);tile.addView(icon);}tile.setMinimumHeight(dp(150));TextView label=text(title,20,0xff343434);label.setTypeface(null,1);tile.addView(label);space(tile,4);tile.addView(text(detail,12,0xff343434));tile.setClickable(true);tile.setFocusable(true);tile.setContentDescription(title+". "+detail);tile.setOnClickListener(v->action.run());return tile;}
+ LinearLayout tile(String title,String detail,String symbol,int color,Runnable action){LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);tile.setPadding(dp(16),dp(14),dp(16),dp(16));tile.setBackgroundColor(color);if(title.equals("Жупень")){ImageView logo=new ImageView(this);logo.setImageResource(getResources().getIdentifier("ic_launcher","drawable",getPackageName()));tile.addView(logo,new LinearLayout.LayoutParams(dp(48),dp(54)));}else if(title.equals("Манул")){ImageView image=new ImageView(this);image.setImageResource(getResources().getIdentifier("manual_icon","drawable",getPackageName()));tile.addView(image,new LinearLayout.LayoutParams(dp(48),dp(54)));}else{TextView icon=text(symbol,25,0xff343434);tile.addView(icon);}tile.setMinimumHeight(dp(150));TextView label=text(title,20,0xff343434);label.setTypeface(null,1);tile.addView(label);space(tile,4);tile.addView(text(detail,12,0xff343434));tile.setClickable(true);tile.setFocusable(true);tile.setContentDescription(title+". "+detail);tile.setOnClickListener(v->action.run());return tile;}
  void openManual(){startActivity(new Intent(this,ManualActivity.class));}
  void openPanel(){
   startActivity(new Intent(this,PanelActivity.class));
@@ -97,9 +98,9 @@ public class MainActivity extends Activity {
  boolean autoUpdates(){return getPreferences(0).getBoolean("check_updates",true);}
  void showAbout(){
   LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(22),dp(12),dp(22),dp(12));String version="";try{android.content.pm.PackageInfo info=getPackageManager().getPackageInfo(getPackageName(),0);version=info.versionName+" · сборка "+info.versionCode;}catch(Exception ignored){}
-  content.addView(text("MTPoxyЁкси",22,0xfff8f8f8));space(content,8);content.addView(text("Версия "+version,14,0xffffb44d));space(content,12);content.addView(text("Это вам не это\n\nАвтор проекта: riehnh.\nИсходники, установка и документация — в GitHub.",14,0xffdedede));space(content,16);
+  content.addView(text("MTPoxyЁкси",22,0xfff8f8f8));space(content,8);content.addView(text("Версия "+version,14,0xffffb44d));space(content,12);content.addView(text("Это вам не это\n\nАвтор проекта: Buy eggs and milk.\nИсходники, установка и документация — в GitHub.",14,0xffdedede));space(content,16);
   CheckBox automatic=new CheckBox(this);automatic.setText("Проверять обновление");automatic.setTextColor(0xfff8f8f8);automatic.setChecked(autoUpdates());automatic.setOnCheckedChangeListener((v,checked)->{getPreferences(0).edit().putBoolean("check_updates",checked).apply();if(!checked&&!pendingUpdateManual)pendingVersion="";});content.addView(automatic);
-  aboutCheckButton=button("Проверить обновление",true);aboutCheckButton.setEnabled(!updateChecking);aboutCheckButton.setOnClickListener(v->checkUpdates(true));content.addView(aboutCheckButton,new LinearLayout.LayoutParams(-1,dp(50)));aboutUpdateStatus=text(updateChecking?"Проверяем…":"",13,0xffdedede);content.addView(aboutUpdateStatus);
+  aboutCheckButton=button("Проверить обновление",true);aboutCheckButton.setEnabled(!updateChecking);aboutCheckButton.setOnClickListener(v->checkUpdates(true));content.addView(aboutCheckButton,new LinearLayout.LayoutParams(-1,dp(50)));Button qr=button("Куркод",false);qr.setOnClickListener(v->QrDialog.show(this,"Куркод · скачать Ёкси",QrDialog.APP_URL));content.addView(qr,new LinearLayout.LayoutParams(-1,dp(50)));aboutUpdateStatus=text(updateChecking?"Проверяем…":"",13,0xffdedede);content.addView(aboutUpdateStatus);
   ScrollView scroll=new ScrollView(this);scroll.addView(content);aboutDialog=new AlertDialog.Builder(this).setTitle("Факинг").setView(scroll).setPositiveButton("Открыть GitHub",(d,w)->{try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://github.com/riehnh/mtpoxy-panel")));}catch(ActivityNotFoundException e){Toast.makeText(this,"Нужен браузер",Toast.LENGTH_LONG).show();}}).setNegativeButton("Закрыть",null).create();aboutDialog.setOnDismissListener(d->offerUpdate());aboutDialog.show();
  }
  void updateStatus(String value){if(aboutUpdateStatus!=null)aboutUpdateStatus.setText(value);}
@@ -120,18 +121,19 @@ public class MainActivity extends Activity {
  void operationUi(CancellableOperation run,Runnable action){ui(()->{if(operation==run&&!run.isCancelled())action.run();});}
  void finishFreeLoading(){if(loadingFree){loadingFree=false;showAutomatic(false);}}
  void renderFree(){
-  if(freeRows==null||loadingFree)return;freeRows.removeAllViews();int count=Math.min(visibleFree,proxies.size());
+  if(freeRows==null||loadingFree)return;sortFree(proxies);freeRows.removeAllViews();int count=Math.min(visibleFree,proxies.size());
   for(int i=0;i<count;i++){Proxy p=proxies.get(i);LinearLayout row=new LinearLayout(this);row.setOrientation(1);row.setPadding(dp(14),dp(12),dp(14),dp(12));row.setBackgroundColor(0xff454545);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.topMargin=dp(10);freeRows.addView(row,rp);row.addView(text(p.host+":"+p.port,16,0xfff8f8f8));row.addView(text(p.ms>=0?PingQuality.label(p.ms)+" · "+p.ms+" мс · "+android.text.format.DateFormat.format("dd.MM HH:mm",p.checkedAt):PingQuality.label(p.ms),13,PingQuality.color(p.ms)));Button want=button("Хочу!",false);want.setEnabled(!busy);want.setOnClickListener(v->openCandidates(p));row.addView(want);}
   if(count<proxies.size()){Button more=button("Показать ещё · "+(proxies.size()-count),false);more.setOnClickListener(v->{visibleFree+=60;renderFree();});freeRows.addView(more);}
  }
+ static void sortFree(List<Proxy> list){list.sort((a,b)->{long x=a.ms>=0?a.ms:a.ms==-2?Long.MAX_VALUE-1:Long.MAX_VALUE;long y=b.ms>=0?b.ms:b.ms==-2?Long.MAX_VALUE-1:Long.MAX_VALUE;int order=Long.compare(x,y);return order!=0?order:a.host.compareTo(b.host);});}
  static ArrayList<Proxy> candidateList(List<Proxy> list,Proxy wanted){ArrayList<Proxy> result=new ArrayList<>();for(Proxy p:list)if(p.ms>=0&&p!=wanted)result.add(p);result.sort((a,b)->Long.compare(a.ms,b.ms));if(wanted!=null)result.add(0,wanted);return result;}
  void openCandidates(Proxy wanted){
-  if(busy)return;candidates.clear();candidates.addAll(candidateList(proxies,wanted));
+  if(busy)return;candidates.clear();candidates.addAll(candidateList(proxies,wanted));candidatePings.clear();for(Proxy p:candidates)candidatePings.put(p,p.ms);
   if(candidates.isEmpty()){Toast.makeText(this,"Сначала нажмите «Проверить»: нет доступных вариантов",Toast.LENGTH_LONG).show();return;}
   screen=Screen.AUTOMATIC;candidateIndex=0;candidateCount=candidates.size();LinearLayout page=modePage();Button back=button("← К списку",false);back.setOnClickListener(v->onBackPressed());page.addView(back);space(page,16);status=text("",14,0xffdedede);page.addView(status);progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setVisibility(View.GONE);page.addView(progress);automaticResults=new LinearLayout(this);automaticResults.setOrientation(1);page.addView(automaticResults);recheckCandidate();
  }
  void recheckCandidate(){
-  Proxy p=candidates.get(candidateIndex);busy=true;automaticResults.removeAllViews();status.setText("Проверяем "+p.host+"…");progress.setIndeterminate(true);progress.setVisibility(View.VISIBLE);io.execute(()->{ProbeEngine.refreshDns();long value=ProbeEngine.measure(p.host,p.port,2000);ui(()->{p.ms=value;p.checkedAt=System.currentTimeMillis();busy=false;progress.setVisibility(View.GONE);progress.setIndeterminate(false);savePings();showCandidate();});});
+  Proxy p=candidates.get(candidateIndex);busy=true;automaticResults.removeAllViews();status.setText("Проверяем "+p.host+"…");progress.setIndeterminate(true);progress.setVisibility(View.VISIBLE);io.execute(()->{ProbeEngine.refreshDns();long value=ProbeEngine.measure(p.host,p.port,2000);ui(()->{p.ms=value;p.checkedAt=System.currentTimeMillis();busy=false;progress.setVisibility(View.GONE);progress.setIndeterminate(false);status.setText(value>=0?"Доступен · проверен сейчас":"Сейчас не отвечает. Можно выбрать следующий.");savePings();showCandidate();});});
  }
  void restorePings(){try{org.json.JSONObject saved=new org.json.JSONObject(getPreferences(0).getString("pings","{}"));for(Proxy p:proxies){org.json.JSONArray row=saved.optJSONArray(proxyUri(p).toString());if(row!=null){p.ms=row.getLong(0);p.checkedAt=row.getLong(1);}}}catch(Exception ignored){}}
  void savePings(){try{org.json.JSONObject saved=new org.json.JSONObject();for(Proxy p:proxies)saved.put(proxyUri(p).toString(),new org.json.JSONArray().put(p.ms).put(p.checkedAt));getPreferences(0).edit().putString("pings",saved.toString()).apply();}catch(Exception ignored){}}
@@ -180,6 +182,7 @@ public class MainActivity extends Activity {
   card.addView(text("Вариант "+(candidateIndex+1)+" из "+candidateCount,13,0xffdedede));
   space(card,8);
   card.addView(text(candidate.host+" · порт "+candidate.port,17,0xfff6f0ea));
+  Long listed=candidatePings.get(candidate);if(listed!=null&&listed>=0)card.addView(text("Пинг списка: "+listed+" мс · порядок выбора",13,0xffdedede));
   card.addView(text(candidate.ms>=0?PingQuality.label(candidate.ms)+" · "+candidate.ms+" мс":PingQuality.label(candidate.ms),26,PingQuality.color(candidate.ms)));
   space(card,16);
   Button push=button("Пихаем",true);
@@ -187,6 +190,7 @@ public class MainActivity extends Activity {
   push.setOnClickListener(v->connect(candidate));
   card.addView(push);
   space(card,8);
+  Button qr=button("КурКод",false);qr.setOnClickListener(v->QrDialog.show(this,"КурКод · прокси",new Uri.Builder().scheme("https").authority("t.me").path("/proxy").appendQueryParameter("server",candidate.host).appendQueryParameter("port",Integer.toString(candidate.port)).appendQueryParameter("secret",candidate.secret).build().toString()));card.addView(qr);space(card,8);
   Button next=button("Следующий",false);
   boolean hasNext=candidateIndex+1<candidateCount;
   next.setEnabled(hasNext);

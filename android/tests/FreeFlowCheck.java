@@ -19,6 +19,7 @@ public final class FreeFlowCheck {
   cache.put("slow.test",new FutureTask<InetAddress[]>(()->new InetAddress[0]));
   long start=System.nanoTime();if(ProbeEngine.measure("slow.test",443,30)!=-1||TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-start)>500)throw new AssertionError("DNS deadline");
   ProbeEngine.refreshDns();if(!cache.isEmpty())throw new AssertionError("Fresh DNS on each check");
+  MainActivity.Proxy unknown=new MainActivity.Proxy("unknown.example",443,"d");ArrayList<MainActivity.Proxy> scrambled=new ArrayList<>(Arrays.asList(dead,slow,unknown,fast));MainActivity.sortFree(scrambled);if(scrambled.get(0)!=fast||scrambled.get(1)!=slow||scrambled.get(2)!=unknown||scrambled.get(3)!=dead)throw new AssertionError("Ascending list with dead last");
   System.out.println("PASS: best / wanted / unavailable selection, no duplicate, DNS deadline and private-address refusal");
  }
 }
